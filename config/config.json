@@ -1,0 +1,38 @@
+{
+  "sessions": [
+    "2024-2025",
+    "2025-2026",
+    "2026-2027",
+    "2027-2028"
+  ],
+  "default_session": "2025-2026",
+  "max_marks_options": [
+    50,
+    75,
+    100
+  ],
+  "default_max_marks": 100,
+  "class_defaults": {
+    "I": 220,
+    "II": 220,
+    "III": 220,
+    "IV": 220,
+    "V": 220,
+    "VI": 240,
+    "VII": 240,
+    "VIII": 240,
+    "IX": 240,
+    "X": 240
+  },
+  "subjects": [
+    "English",
+    "Urdu",
+    "Mathematics",
+    "Science/Env.Sci",
+    "S.St/P.St",
+    "Islamiyat",
+    "Sindhi",
+    "Computer",
+    "rayyan ka"
+  ]
+}
