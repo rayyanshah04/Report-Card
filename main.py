@@ -1150,29 +1150,172 @@ class StudentViewWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         
-        layout = QVBoxLayout()
+        main_layout = QHBoxLayout()
         
-        # Top buttons
-        btn_layout = QHBoxLayout()
+        # Left sidebar
+        left_panel = QWidget()
+        left_panel.setMaximumWidth(250)
+        left_panel.setStyleSheet("""
+            QWidget {
+                background-color: #2c3e50;
+                color: white;
+            }
+            QPushButton {
+                background-color: #34495e;
+                color: white;
+                border: none;
+                padding: 12px;
+                text-align: left;
+                font-size: 12px;
+                border-radius: 5px;
+                margin: 5px;
+            }
+            QPushButton:hover {
+                background-color: #3498db;
+            }
+            QLabel {
+                color: white;
+                font-size: 11px;
+                padding: 5px;
+            }
+        """)
         
-        download_sample_btn = QPushButton("📥 Download Sample Excel")
-        download_sample_btn.clicked.connect(self.download_sample_excel)
-        btn_layout.addWidget(download_sample_btn)
+        left_layout = QVBoxLayout()
+        left_layout.setContentsMargins(10, 20, 10, 10)
+        left_layout.setSpacing(5)
         
-        upload_excel_btn = QPushButton("📤 Upload Excel")
-        upload_excel_btn.clicked.connect(self.upload_excel)
-        btn_layout.addWidget(upload_excel_btn)
+        # Title
+        title_label = QLabel("📚 STUDENT MANAGEMENT")
+        title_label.setStyleSheet("font-size: 13px; font-weight: bold; padding: 10px;")
+        left_layout.addWidget(title_label)
+        
+        # Action buttons
+        view_all_btn = QPushButton("👥 View All Students")
+        view_all_btn.clicked.connect(self.view_all_students)
+        left_layout.addWidget(view_all_btn)
+        
+        view_single_btn = QPushButton("👤 View Single Student")
+        view_single_btn.clicked.connect(self.view_single_student)
+        left_layout.addWidget(view_single_btn)
+        
+        left_layout.addWidget(QLabel(""))
+        
+        download_btn = QPushButton("📥 Download Sample Excel")
+        download_btn.clicked.connect(self.download_sample_excel)
+        left_layout.addWidget(download_btn)
+        
+        upload_btn = QPushButton("📤 Upload Excel File")
+        upload_btn.clicked.connect(self.upload_excel)
+        left_layout.addWidget(upload_btn)
+        
+        left_layout.addWidget(QLabel(""))
         
         delete_btn = QPushButton("🗑️ Delete Selected")
         delete_btn.clicked.connect(self.delete_student)
-        btn_layout.addWidget(delete_btn)
+        left_layout.addWidget(delete_btn)
         
-        refresh_btn = QPushButton("🔄 Refresh")
+        refresh_btn = QPushButton("🔄 Refresh Data")
         refresh_btn.clicked.connect(self.load_students)
-        btn_layout.addWidget(refresh_btn)
+        left_layout.addWidget(refresh_btn)
         
-        btn_layout.addStretch()
-        layout.addLayout(btn_layout)
+        left_layout.addStretch()
+        left_panel.setLayout(left_layout)
+        
+        # Right content area
+        right_panel = QWidget()
+        right_layout = QVBoxLayout()
+        right_layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Search and filter section
+        search_layout = QHBoxLayout()
+        
+        search_label = QLabel("🔍 Search:")
+        search_label.setStyleSheet("font-size: 12px; font-weight: bold;")
+        search_layout.addWidget(search_label)
+        
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search by Name, G.R No, or Class...")
+        self.search_input.textChanged.connect(self.filter_students)
+        self.search_input.setStyleSheet("""
+            QLineEdit {
+                padding: 8px;
+                border: 2px solid #e1e8ed;
+                border-radius: 6px;
+                font-size: 11px;
+            }
+            QLineEdit:focus {
+                border: 2px solid #3498db;
+            }
+        """)
+        search_layout.addWidget(self.search_input)
+        
+        filter_label = QLabel("Filter by Class:")
+        filter_label.setStyleSheet("font-size: 12px; font-weight: bold; margin-left: 20px;")
+        search_layout.addWidget(filter_label)
+        
+        self.class_filter = NoWheelComboBox()
+        self.class_filter.addItem("All Classes")
+        self.class_filter.currentTextChanged.connect(self.filter_students)
+        self.class_filter.setMinimumWidth(120)
+        search_layout.addWidget(self.class_filter)
+        
+        filter_status_label = QLabel("Status:")
+        filter_status_label.setStyleSheet("font-size: 12px; font-weight: bold; margin-left: 20px;")
+        search_layout.addWidget(filter_status_label)
+        
+        self.status_filter = NoWheelComboBox()
+        self.status_filter.addItems(["All", "Active", "Left", "Inactive"])
+        self.status_filter.currentTextChanged.connect(self.filter_students)
+        self.status_filter.setMinimumWidth(100)
+        search_layout.addWidget(self.status_filter)
+        
+        right_layout.addLayout(search_layout)
+        
+        # Stats section
+        stats_layout = QHBoxLayout()
+        stats_layout.setSpacing(15)
+        
+        self.total_students_label = QLabel("Total Students: 0")
+        self.total_students_label.setStyleSheet("""
+            QLabel {
+                background-color: #3498db;
+                color: white;
+                padding: 10px 15px;
+                border-radius: 8px;
+                font-weight: bold;
+                font-size: 12px;
+            }
+        """)
+        stats_layout.addWidget(self.total_students_label)
+        
+        self.active_students_label = QLabel("Active: 0")
+        self.active_students_label.setStyleSheet("""
+            QLabel {
+                background-color: #27ae60;
+                color: white;
+                padding: 10px 15px;
+                border-radius: 8px;
+                font-weight: bold;
+                font-size: 12px;
+            }
+        """)
+        stats_layout.addWidget(self.active_students_label)
+        
+        self.inactive_students_label = QLabel("Inactive: 0")
+        self.inactive_students_label.setStyleSheet("""
+            QLabel {
+                background-color: #e74c3c;
+                color: white;
+                padding: 10px 15px;
+                border-radius: 8px;
+                font-weight: bold;
+                font-size: 12px;
+            }
+        """)
+        stats_layout.addWidget(self.inactive_students_label)
+        
+        stats_layout.addStretch()
+        right_layout.addLayout(stats_layout)
         
         # Students table
         self.students_table = QTableWidget()
@@ -1185,10 +1328,42 @@ class StudentViewWidget(QWidget):
         self.students_table.setAlternatingRowColors(True)
         self.students_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.students_table.setSelectionBehavior(QTableWidget.SelectRows)
-        layout.addWidget(self.students_table)
+        self.students_table.setStyleSheet("""
+            QTableWidget {
+                background-color: white;
+                border: 1px solid #e1e8ed;
+                border-radius: 8px;
+                gridline-color: #e1e8ed;
+            }
+            QTableWidget::item {
+                padding: 8px;
+            }
+            QTableWidget::item:selected {
+                background-color: #3498db;
+                color: white;
+            }
+            QHeaderView::section {
+                background-color: #34495e;
+                color: white;
+                padding: 10px;
+                border: none;
+                font-weight: bold;
+                font-size: 11px;
+            }
+        """)
+        self.students_table.doubleClicked.connect(self.view_single_student)
+        right_layout.addWidget(self.students_table)
         
-        self.setLayout(layout)
+        right_panel.setLayout(right_layout)
+        
+        # Add panels to main layout
+        main_layout.addWidget(left_panel)
+        main_layout.addWidget(right_panel, 1)
+        
+        self.setLayout(main_layout)
+        self.all_students = []  # Store all students for filtering
         self.load_students()
+        self.load_class_filter()
     
     def load_students(self):
         """Load students from database"""
@@ -1206,11 +1381,422 @@ class StudentViewWidget(QWidget):
         students = cursor.fetchall()
         conn.close()
         
+        self.all_students = students  # Store for filtering
+        self.display_students(students)
+        self.update_stats()
+    
+    def display_students(self, students):
+        """Display students in table"""
         self.students_table.setRowCount(len(students))
         for row_idx, student in enumerate(students):
             for col_idx, value in enumerate(student):
                 item = QTableWidgetItem(str(value) if value else "")
                 self.students_table.setItem(row_idx, col_idx, item)
+    
+    def update_stats(self):
+        """Update statistics labels"""
+        import sqlite3
+        conn = sqlite3.connect("report_system.db")
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT COUNT(*) FROM students")
+        total = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM students WHERE status = 'Active'")
+        active = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM students WHERE status != 'Active'")
+        inactive = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        self.total_students_label.setText(f"Total Students: {total}")
+        self.active_students_label.setText(f"Active: {active}")
+        self.inactive_students_label.setText(f"Inactive: {inactive}")
+    
+    def load_class_filter(self):
+        """Load unique classes for filter dropdown"""
+        import sqlite3
+        conn = sqlite3.connect("report_system.db")
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT DISTINCT current_class_sec FROM students WHERE current_class_sec IS NOT NULL ORDER BY current_class_sec")
+        classes = cursor.fetchall()
+        conn.close()
+        
+        self.class_filter.clear()
+        self.class_filter.addItem("All Classes")
+        for cls in classes:
+            if cls[0]:
+                self.class_filter.addItem(cls[0])
+    
+    def filter_students(self):
+        """Filter students based on search and filter criteria"""
+        search_text = self.search_input.text().lower()
+        selected_class = self.class_filter.currentText()
+        selected_status = self.status_filter.currentText()
+        
+        filtered = []
+        for student in self.all_students:
+            # Search filter
+            if search_text:
+                student_text = " ".join(str(s).lower() for s in student if s)
+                if search_text not in student_text:
+                    continue
+            
+            # Class filter
+            if selected_class != "All Classes":
+                if student[3] != selected_class:  # current_class_sec is index 3
+                    continue
+            
+            # Status filter
+            if selected_status != "All":
+                if student[5] != selected_status:  # status is index 5
+                    continue
+            
+            filtered.append(student)
+        
+        self.display_students(filtered)
+    
+    def view_all_students(self):
+        """Reset filters and show all students"""
+        self.search_input.clear()
+        self.class_filter.setCurrentIndex(0)
+        self.status_filter.setCurrentIndex(0)
+        self.load_students()
+    
+    def view_single_student(self):
+        """View detailed information of a single student"""
+        selected_row = self.students_table.currentRow()
+        
+        if selected_row < 0:
+            QMessageBox.warning(self, "No Selection", "Please select a student to view!")
+            return
+        
+        # Get student details
+        gr_no = self.students_table.item(selected_row, 0).text()
+        
+        import sqlite3
+        from datetime import datetime
+        conn = sqlite3.connect("report_system.db")
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT student_id, gr_no, student_name, father_name, current_class_sec, current_session, 
+                   status, joining_date, left_date, left_reason, date_of_birth, 
+                   contact_number_resident, contact_number_neighbour, contact_number_relative,
+                   contact_number_other1, contact_number_other2, contact_number_other3,
+                   contact_number_other4, address, created_at, updated_at
+            FROM students WHERE gr_no = ?
+        """, (gr_no,))
+        
+        student = cursor.fetchone()
+        conn.close()
+        
+        if not student:
+            return
+        
+        # Format date helper
+        def format_date(date_str):
+            if not date_str:
+                return "N/A"
+            try:
+                # Handle both "YYYY-MM-DD" and "YYYY-MM-DD HH:MM:SS" formats
+                if " " in date_str:
+                    date_obj = datetime.strptime(date_str.split()[0], "%Y-%m-%d")
+                else:
+                    date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+                day = date_obj.day
+                month = date_obj.strftime("%B")
+                year = date_obj.year
+                return f"{day} {month} {year}"  # 4 April 2015
+            except:
+                return date_str
+        
+        # Calculate age
+        age_str = "N/A"
+        dob_formatted = format_date(student[10])
+        if student[10]:  # date_of_birth
+            try:
+                # Handle both formats
+                date_part = student[10].split()[0] if " " in student[10] else student[10]
+                dob = datetime.strptime(date_part, "%Y-%m-%d")
+                today = datetime.now()
+                age_years = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+                age_months = (today.year - dob.year) * 12 + today.month - dob.month
+                if (today.day < dob.day):
+                    age_months -= 1
+                age_str = f"{age_years} years ({age_months} months)"
+            except:
+                age_str = "N/A"
+        
+        # Calculate years studying
+        years_studying_str = "N/A"
+        joining_date_formatted = format_date(student[7])
+        if student[7]:  # joining_date
+            try:
+                # Handle both formats
+                date_part = student[7].split()[0] if " " in student[7] else student[7]
+                join_date = datetime.strptime(date_part, "%Y-%m-%d")
+                today = datetime.now()
+                years = today.year - join_date.year - ((today.month, today.day) < (join_date.month, join_date.day))
+                months = (today.year - join_date.year) * 12 + today.month - join_date.month
+                if (today.day < join_date.day):
+                    months -= 1
+                years_studying_str = f"{years} years {months % 12} months"
+            except:
+                years_studying_str = "N/A"
+        
+        # Format left date
+        left_date_formatted = format_date(student[8])
+        
+        # Create detailed view dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Student Details - {student[2]}")
+        dialog.setMinimumSize(800, 700)
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: #f8f9fa;
+            }
+        """)
+        
+        layout = QVBoxLayout()
+        layout.setSpacing(20)
+        layout.setContentsMargins(30, 30, 30, 30)
+        
+        # Header with student name and photo placeholder
+        header = QWidget()
+        header.setStyleSheet("""
+            QWidget {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #3498db, stop:1 #2980b9);
+                border-radius: 12px;
+                padding: 20px;
+            }
+        """)
+        header_layout = QHBoxLayout()
+        
+        # Left side - Student info
+        left_header_layout = QVBoxLayout()
+        left_header_layout.setSpacing(5)
+        
+        student_name = QLabel(student[2])
+        student_name.setStyleSheet("font-size: 24px; font-weight: bold; color: white;")
+        left_header_layout.addWidget(student_name)
+        
+        gr_label = QLabel(f"G.R No: {student[1]}")
+        gr_label.setStyleSheet("font-size: 14px; color: #ecf0f1;")
+        left_header_layout.addWidget(gr_label)
+        
+        address_label = QLabel(f"Address: {student[18] or 'N/A'}")
+        address_label.setStyleSheet("font-size: 14px; color: #ecf0f1;")
+        address_label.setWordWrap(True)
+        left_header_layout.addWidget(address_label)
+        
+        header_layout.addLayout(left_header_layout, 3)
+        header_layout.addStretch()
+        
+        # Right side - Contact numbers
+        right_header_layout = QVBoxLayout()
+        right_header_layout.setSpacing(5)
+        
+        contact_title = QLabel("Contact Information")
+        contact_title.setStyleSheet("font-size: 16px; font-weight: bold; color: white;")
+        right_header_layout.addWidget(contact_title)
+        
+        # Collect all valid contact numbers
+        contacts_list = [
+            ("Resident", student[11]),
+            ("Neighbour", student[12]),
+            ("Relative", student[13]),
+            ("Other 1", student[14]),
+            ("Other 2", student[15]),
+            ("Other 3", student[16]),
+            ("Other 4", student[17]),
+        ]
+        
+        has_contacts = False
+        for label, contact in contacts_list:
+            if contact and str(contact).lower() not in ['', 'nan', 'none', 'null']:
+                has_contacts = True
+                contact_row = QHBoxLayout()
+                contact_row.setSpacing(10)
+                
+                contact_label = QLabel(f"{label}: {contact}")
+                contact_label.setStyleSheet("font-size: 13px; color: #ecf0f1;")
+                contact_row.addWidget(contact_label)
+                
+                copy_btn = QPushButton("📋")
+                copy_btn.setFixedSize(30, 25)
+                copy_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(255, 255, 255, 0.2);
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        font-size: 14px;
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(255, 255, 255, 0.3);
+                    }
+                """)
+                copy_btn.clicked.connect(lambda checked, num=contact: self.copy_to_clipboard(str(num)))
+                contact_row.addWidget(copy_btn)
+                
+                right_header_layout.addLayout(contact_row)
+        
+        if not has_contacts:
+            no_contact = QLabel("No contact found")
+            no_contact.setStyleSheet("font-size: 13px; color: #ecf0f1; font-style: italic;")
+            right_header_layout.addWidget(no_contact)
+        
+        header_layout.addLayout(right_header_layout, 2)
+        
+        header.setLayout(header_layout)
+        layout.addWidget(header)
+        
+        # Scrollable content
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
+        
+        content_widget = QWidget()
+        content_layout = QVBoxLayout()
+        content_layout.setSpacing(25)
+        content_layout.setContentsMargins(0, 20, 0, 0)
+        
+        # Personal Information Section
+        content_layout.addWidget(self.create_simple_section("📋 Personal Information", [
+            ("Student ID", str(student[0])),
+            ("G.R Number", student[1]),
+            ("Student Name", student[2]),
+            ("Father's Name", student[3]),
+            ("Date of Birth", dob_formatted),
+            ("Current Age", age_str),
+        ]))
+        
+        # Academic Information Section
+        content_layout.addWidget(self.create_simple_section("🎓 Academic Information", [
+            ("Current Class/Section", student[4] or "N/A"),
+            ("Current Session", student[5] or "N/A"),
+            ("Joining Date", joining_date_formatted),
+            ("Years Studying", years_studying_str),
+            ("Status", student[6]),
+        ]))
+        
+        # Contact Information Section
+        contacts = []
+        if student[11]: contacts.append(("Resident Contact", student[11]))
+        if student[12]: contacts.append(("Neighbour Contact", student[12]))
+        if student[13]: contacts.append(("Relative Contact", student[13]))
+        if student[14]: contacts.append(("Other Contact 1", student[14]))
+        if student[15]: contacts.append(("Other Contact 2", student[15]))
+        if student[16]: contacts.append(("Other Contact 3", student[16]))
+        if student[17]: contacts.append(("Other Contact 4", student[17]))
+        
+        if not contacts:
+            contacts = [("No contact numbers available", "")]
+        
+        content_layout.addWidget(self.create_simple_section("📞 Contact Information", contacts))
+        
+        # Address Section
+        content_layout.addWidget(self.create_simple_section("📍 Address", [
+            ("Full Address", student[18] or "N/A"),
+        ]))
+        
+        # Left/Inactive Status Section (if applicable)
+        if student[6] in ['Left', 'Inactive']:
+            content_layout.addWidget(self.create_simple_section("⚠️ Status Information", [
+                ("Status", student[6]),
+                ("Left Date", left_date_formatted),
+                ("Reason for Leaving", student[9] or "N/A"),
+            ]))
+        
+        # System Information Section
+        content_layout.addWidget(self.create_simple_section("🖥️ System Information", [
+            ("Record Created", student[19] or "N/A"),
+            ("Last Updated", student[20] or "N/A"),
+        ]))
+        
+        content_widget.setLayout(content_layout)
+        scroll.setWidget(content_widget)
+        layout.addWidget(scroll)
+        
+        # Close button
+        close_btn = QPushButton("✖ Close")
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #e74c3c;
+                color: white;
+                padding: 12px;
+                border: none;
+                border-radius: 6px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #c0392b;
+            }
+        """)
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn)
+        
+        dialog.setLayout(layout)
+        dialog.exec()
+    
+    def copy_to_clipboard(self, text):
+        """Copy text to clipboard"""
+        from PySide6.QtWidgets import QApplication
+        clipboard = QApplication.clipboard()
+        clipboard.setText(text)
+        QMessageBox.information(self, "Copied", f"Contact number copied to clipboard:\n{text}")
+    
+    def create_simple_section(self, title, fields):
+        """Create a simple flat section without boxes"""
+        section = QWidget()
+        section.setStyleSheet("QWidget { background-color: transparent; }")
+        
+        section_layout = QVBoxLayout()
+        section_layout.setSpacing(8)
+        section_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Section title
+        title_label = QLabel(title)
+        title_label.setStyleSheet("""
+            font-size: 15px;
+            font-weight: bold;
+            color: #2c3e50;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #3498db;
+        """)
+        section_layout.addWidget(title_label)
+        
+        # Fields in a simple list
+        for label, value in fields:
+            field_layout = QHBoxLayout()
+            field_layout.setContentsMargins(10, 5, 0, 5)
+            
+            label_widget = QLabel(label + ":")
+            label_widget.setStyleSheet("""
+                font-weight: bold;
+                color: #34495e;
+                font-size: 12px;
+                min-width: 180px;
+            """)
+            field_layout.addWidget(label_widget)
+            
+            value_widget = QLabel(str(value))
+            value_widget.setStyleSheet("""
+                color: #2c3e50;
+                font-size: 12px;
+            """)
+            value_widget.setWordWrap(True)
+            field_layout.addWidget(value_widget, 1)
+            
+            section_layout.addLayout(field_layout)
+        
+        section.setLayout(section_layout)
+        return section
     
     def delete_student(self):
         """Delete selected student"""
@@ -1715,7 +2301,10 @@ class MainWindow(NavigableMainWindow):
         # Create tab widget
         self.tab_widget = QTabWidget()
         self.tab_widget.addTab(scroll, "Result")
-        self.tab_widget.addTab(StudentViewWidget(self), "Student View")
+        
+        # Import StudentViewScreen from new location
+        from src.ui.screens.student_view_screen import StudentViewScreen
+        self.tab_widget.addTab(StudentViewScreen(self), "Student View")
         
         self.setCentralWidget(self.tab_widget)
 
