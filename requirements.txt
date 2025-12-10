@@ -5,3 +5,6 @@ pyside6_essentials==6.10.0
 weasyprint==66.0
 pandas
 openpyxl
+fastapi==0.115.5
+uvicorn[standard]==0.32.0
+python-multipart==0.0.9
