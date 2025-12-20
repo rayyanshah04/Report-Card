@@ -222,12 +222,22 @@ body {
   right: 44mm;
 }
 
+.diag-bubbles .b5 {
+  top: 42mm;
+  left: 42mm;
+}
+
+.diag-bubbles .b6 {
+  bottom: 58mm;
+  right: 58mm;
+}
+
 .diag-plane {
   position: absolute;
-  bottom: 24mm;
+  bottom: -9mm;
   right: 24mm;
-  width: 22mm;
-  height: 12mm;
+  width: 52mm;
+  height: 42mm;
   border: 1px solid #bdbdbd;
   border-radius: 2mm;
   transform: rotate(-8deg);
@@ -260,10 +270,10 @@ body {
 
 .diag-rocket {
   position: absolute;
-  bottom: 18mm;
-  left: 16mm;
-  width: 16mm;
-  height: 26mm;
+  bottom: -2mm;
+  left: 36mm;
+  width: 26mm;
+  height: 36mm;
   border: 1px solid #bcbcbc;
   border-radius: 8mm 8mm 4mm 4mm;
   background: #f4f4f4;
@@ -327,13 +337,58 @@ body {
 }
 
 .diag-cloud-left {
-  top: 24mm;
+  top: 15mm;
   left: 13mm;
 }
 
 .diag-cloud-right {
-  top: 20mm;
+  top: 37mm;
   right: 11mm;
+}
+
+.diag-kite {
+  position: absolute;
+  top: 44mm;
+  left: 50%;
+  width: 12mm;
+  height: 12mm;
+  border: 1px solid #c2c2c2;
+  background: #f8f8f8;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.diag-kite::after {
+  content: '';
+  position: absolute;
+  width: 20mm;
+  height: 1px;
+  background: #c2c2c2;
+  top: 10mm;
+  left: 6mm;
+  transform: rotate(30deg);
+}
+
+.diag-pencil {
+  position: absolute;
+  bottom: 62mm;
+  left: 24mm;
+  width: 28mm;
+  height: 5mm;
+  border: 1px solid #c2c2c2;
+  background: #f7f7f7;
+  transform: rotate(-18deg);
+}
+
+.diag-pencil::before {
+  content: '';
+  position: absolute;
+  right: -4mm;
+  top: -1mm;
+  width: 4mm;
+  height: 7mm;
+  border: 1px solid #c2c2c2;
+  background: #fff;
+  transform: skewX(-12deg);
 }
 
 .diag-ribbon {
