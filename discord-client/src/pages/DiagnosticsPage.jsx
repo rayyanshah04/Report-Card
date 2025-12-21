@@ -4,6 +4,7 @@ import api, { API_BASE } from '../services/api';
 import useDiagnosticsStore from '../store/diagnosticsStore';
 
 const ratingOptions = ['Excellent', 'Very Good', 'Good', 'Fair'];
+const rankOptions = ['N/A', ...Array.from({ length: 10 }, (_, idx) => `${idx + 1}`)];
 const diagnosticsSections = [
   {
     title: 'GENERAL PROGRESS',
@@ -72,7 +73,9 @@ export default function DiagnosticsPage() {
     studentName: '',
     fatherName: '',
     classSec: '',
+    rank: rankOptions[0],
     totalDays: '',
+    daysAttended: '',
     attendanceDates: '',
     overallRemark: '',
     comment: '',
@@ -82,6 +85,7 @@ export default function DiagnosticsPage() {
   const [lastFetchedGrNo, setLastFetchedGrNo] = useState('');
 
   const canAutoFill = useMemo(() => Boolean(form.grNo.trim()) && form.grNo.trim() !== lastFetchedGrNo, [form.grNo, lastFetchedGrNo]);
+  const daysAbsent = Math.max(Number(form.totalDays || 0) - Number(form.daysAttended || 0), 0);
 
   useEffect(() => {
     refreshQueueCount().catch(() => {
@@ -117,8 +121,11 @@ export default function DiagnosticsPage() {
     father_name: form.fatherName.trim(),
     class_sec: form.classSec.trim(),
     gr_no: form.grNo.trim(),
-    attendance: form.attendanceDates.trim(),
-    attendance_out_of: form.totalDays ? String(form.totalDays).trim() : '',
+    rank: form.rank,
+    total_days: form.totalDays ? String(form.totalDays).trim() : '',
+    days_attended: form.daysAttended ? String(form.daysAttended).trim() : '',
+    days_absent: String(daysAbsent),
+    attendance_dates: form.attendanceDates.trim(),
     overall_remark: form.overallRemark.trim(),
     term: form.term,
     comment: form.comment.trim(),
@@ -138,7 +145,9 @@ export default function DiagnosticsPage() {
       studentName: '',
       fatherName: '',
       classSec: '',
+      rank: rankOptions[0],
       totalDays: '',
+      daysAttended: '',
       attendanceDates: '',
       overallRemark: '',
       comment: '',
@@ -237,6 +246,16 @@ export default function DiagnosticsPage() {
             />
           </label>
           <label>
+            <span>Rank in Class</span>
+            <select className="input dark" value={form.rank} onChange={(event) => setForm((prev) => ({ ...prev, rank: event.target.value }))}>
+              {rankOptions.map((rank) => (
+                <option key={rank} value={rank}>
+                  {rank}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             <span>Total Days</span>
             <input
               className="input dark"
@@ -245,6 +264,20 @@ export default function DiagnosticsPage() {
               value={form.totalDays}
               onChange={(event) => setForm((prev) => ({ ...prev, totalDays: event.target.value }))}
             />
+          </label>
+          <label>
+            <span>Days Attended</span>
+            <input
+              className="input dark"
+              type="number"
+              min="0"
+              value={form.daysAttended}
+              onChange={(event) => setForm((prev) => ({ ...prev, daysAttended: event.target.value }))}
+            />
+          </label>
+          <label>
+            <span>Days Absent</span>
+            <input className="input dark" value={daysAbsent} readOnly />
           </label>
           <label>
             <span>Dates Attendance</span>

@@ -79,8 +79,11 @@ class DiagnosticsRequest(BaseModel):
     father_name: str
     class_sec: str
     gr_no: str
-    attendance: str
-    attendance_out_of: str
+    rank: str
+    total_days: str
+    days_attended: str
+    days_absent: str
+    attendance_dates: str
     overall_remark: str
     term: str
     comment: str
@@ -951,15 +954,14 @@ def preview_diagnostics_sample():
         "student_name": "Muhammad Hashim",
         "father_name": "Taha",
         "class_sec": "KG-A",
-        "session": "2025-26",
         "gr_no": "3779",
-        "attendance": "75",
-        "attendance_out_of": "82",
+        "rank": "N/A",
+        "total_days": "82",
+        "days_attended": "75",
+        "days_absent": "7",
+        "attendance_dates": "01 Feb - 28 Feb",
         "overall_remark": "Excellent",
         "term": "Mid Term",
-        "campus": "Campus I",
-        "result_title": "Result Sheet",
-        "exam_title": "Mid Term Examination",
         "comment": "Muhammad Hashim has shown excellent performance in all academic areas. Well done!",
         "diagnostics_sections": [
             {

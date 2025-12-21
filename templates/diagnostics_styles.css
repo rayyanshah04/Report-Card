@@ -491,6 +491,110 @@ h1 {
   margin-top: -10px;
 }
 
+.info-lines {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  margin-bottom: 6px;
+}
+
+.info-line {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  font-size: 11px;
+}
+
+.info-line-split {
+  gap: 20px;
+  width: 100%;
+}
+
+.info-block {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex: 1 1 0;
+}
+
+.info-label {
+  font-weight: 600;
+  min-width: 80px;
+}
+
+.info-fill {
+  flex: 0 0 60mm;
+  width: 60mm;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.info-text {
+  display: block;
+  line-height: 1.0;
+  text-decoration: none;
+  border-bottom: 1px solid #3a3a3a;
+  padding-bottom: 1px;
+}
+
+.info-rule {
+  display: none;
+}
+
+.info-table,
+.marks-table,
+.grading-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin-bottom: 12px;
+  margin-top: 12px;
+}
+
+.info-table th,
+.info-table td,
+.marks-table th,
+.marks-table td,
+.grading-table th,
+.grading-table td {
+  border: 1px solid #3a3a3a;
+  padding: 6px 6px;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
+.info-table th {
+  text-align: left;
+  font-weight: 600;
+  width: auto;
+  white-space: nowrap;
+}
+
+.info-table th:nth-child(1),
+.info-table td:nth-child(1),
+.info-table th:nth-child(3),
+.info-table td:nth-child(3),
+.info-table th:nth-child(5),
+.info-table td:nth-child(5) {
+  border-right: 0;
+}
+
+.info-table th:nth-child(2),
+.info-table td:nth-child(2),
+.info-table th:nth-child(4),
+.info-table td:nth-child(4),
+.info-table th:nth-child(6),
+.info-table td:nth-child(6) {
+  border-left: 0;
+}
+
+.info-table td {
+  font-weight: 500;
+  font-size: 12px;
+  text-align: center;
+}
+
 .diag-head {
   text-align: center;
   margin: 6px 0 10px;

@@ -35,50 +35,52 @@
     </div>
 
     <div class="diag-divider"><span>Student Details</span></div>
-
-    <div class="diag-lines">
-      <div class="diag-line">
-        <div class="diag-field">
-          <span class="diag-label">Name:</span>
-          <span class="diag-value">{{ report.student_name }}</span>
+    <div class="info-lines">
+      <div class="info-line info-line-split">
+        <div class="info-block">
+          <span class="info-label">Student's Name:</span>
+          <span class="info-fill">
+            <span class="info-text" style="font-size: {{ report.student_name_font_size or 18 }}px;">{{
+              report.student_name }}</span>
+            <span class="info-rule"></span>
+          </span>
         </div>
-        <div class="diag-field">
-          <span class="diag-label">Father's Name:</span>
-          <span class="diag-value">{{ report.father_name }}</span>
-        </div>
-      </div>
-      <div class="diag-line">
-        <div class="diag-field">
-          <span class="diag-label">G.R No:</span>
-          <span class="diag-value">{{ report.gr_no }}</span>
-        </div>
-        <div class="diag-field">
-          <span class="diag-label">Class / Sec:</span>
-          <span class="diag-value">{{ report.class_sec }}</span>
-        </div>
-      </div>
-      <div class="diag-line">
-        <div class="diag-field">
-          <span class="diag-label">Attendance:</span>
-          <span class="diag-value">{{ report.attendance }}</span>
-        </div>
-        <div class="diag-field">
-          <span class="diag-label">Out of:</span>
-          <span class="diag-value">{{ report.attendance_out_of }}</span>
-        </div>
-      </div>
-      <div class="diag-line">
-        <div class="diag-field">
-          <span class="diag-label">Overall Remark:</span>
-          <span class="diag-value">{{ report.overall_remark }}</span>
-        </div>
-        <div class="diag-field">
-          <span class="diag-label">Term:</span>
-          <span class="diag-value">{{ report.term }}</span>
+        <div class="info-block">
+          <span class="info-label">Father's Name:</span>
+          <span class="info-fill">
+            <span class="info-text" style="font-size: {{ report.father_name_font_size or 18 }}px;">{{ report.father_name
+              }}</span>
+            <span class="info-rule"></span>
+          </span>
         </div>
       </div>
     </div>
-
+    <table class="info-table">
+      <colgroup>
+        <col style="width: 12%;">
+        <col style="width: 21%;">
+        <col style="width: 12%;">
+        <col style="width: 21%;">
+        <col style="width: 12%;">
+        <col style="width: 22%;">
+      </colgroup>
+      <tr>
+        <th>Class/Sec:</th>
+        <td>{{ report.class_sec }}</td>
+        <th>G.R No:</th>
+        <td>{{ report.gr_no }}</td>
+        <th>Rank in Class:</th>
+        <td>{{ report.rank }}</td>
+      </tr>
+      <tr>
+        <th>Total School Days:</th>
+        <td>{{ report.total_days }}</td>
+        <th>Days Attended:</th>
+        <td>{{ report.days_attended }}</td>
+        <th>Days Absent:</th>
+        <td>{{ report.days_absent }}</td>
+      </tr>
+    </table>
     <div class="diag-divider"><span>Learning Areas</span></div>
     <div class="diag-grid">
       {% for section in report.diagnostics_sections %}

@@ -158,22 +158,21 @@ body {
 .info-fill {
   flex: 0 0 60mm;
   width: 60mm;
-  position: relative;
-  padding-bottom: 2px;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
 .info-text {
-  position: relative;
-  z-index: 1;
+  display: block;
+  line-height: 1.0;
   text-decoration: none;
+  border-bottom: 1px solid #3a3a3a;
+  padding-bottom: 1px;
 }
 
 .info-rule {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  border-bottom: 1px solid #3a3a3a;
+  display: none;
 }
 
 .info-table,
