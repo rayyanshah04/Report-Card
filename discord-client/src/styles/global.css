@@ -666,22 +666,20 @@ textarea.input.dark:focus {
   justify-content: flex-start;
 }
 
-.update-overlay {
+.update-banner {
   position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: rgba(8, 10, 16, 0.6);
+  right: 24px;
+  bottom: 24px;
   z-index: 40;
-}
-
-.update-card {
-  width: min(420px, 90vw);
-  padding: 24px;
+  width: min(360px, 90vw);
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  text-align: left;
+  gap: 10px;
+}
+
+.update-title {
+  margin: 4px 0 0;
 }
 
 .update-progress {

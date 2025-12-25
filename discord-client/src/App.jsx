@@ -46,41 +46,36 @@ function App() {
 
   return (
     <HashRouter>
-      {(updateState.status === 'checking' ||
-        updateState.status === 'available' ||
+      {(updateState.status === 'available' ||
         updateState.status === 'downloading' ||
         updateState.status === 'ready' ||
         updateState.status === 'error') && (
-        <div className="update-overlay">
-          <div className="update-card glass-surface">
-            <p className="eyebrow">Updating</p>
-            <h3>
-              {updateState.status === 'checking' && 'Checking for updates...'}
-              {updateState.status === 'available' && 'Update found. Downloading...'}
+        <div className="update-banner glass-surface">
+          <div>
+            <p className="eyebrow">Updater</p>
+            <p className="update-title">
+              {updateState.status === 'available' && 'Update found. Downloading soon...'}
               {updateState.status === 'downloading' && 'Downloading update...'}
               {updateState.status === 'ready' && 'Update ready'}
               {updateState.status === 'error' && 'Update error'}
-            </h3>
-            {updateState.status === 'downloading' && (
-              <>
-                <div className="update-progress">
-                  <div
-                    className="update-progress-bar"
-                    style={{ width: `${Math.round(updateState.progress?.percent || 0)}%` }}
-                  />
-                </div>
-                <p className="muted">{Math.round(updateState.progress?.percent || 0)}% downloaded</p>
-              </>
-            )}
-            {updateState.status === 'ready' && (
-              <button className="btn btn-primary" onClick={handleInstallUpdate}>
-                Restart & Update
-              </button>
-            )}
-            {updateState.status === 'error' && (
-              <p className="muted">{updateState.message || 'Update failed. Try again later.'}</p>
-            )}
+            </p>
           </div>
+          {updateState.status === 'downloading' && (
+            <div className="update-progress">
+              <div
+                className="update-progress-bar"
+                style={{ width: `${Math.round(updateState.progress?.percent || 0)}%` }}
+              />
+            </div>
+          )}
+          {updateState.status === 'ready' && (
+            <button className="btn btn-primary" onClick={handleInstallUpdate}>
+              Restart & Update
+            </button>
+          )}
+          {updateState.status === 'error' && (
+            <p className="muted">{updateState.message || 'Update failed. Try again later.'}</p>
+          )}
         </div>
       )}
       <Routes>
