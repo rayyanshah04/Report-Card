@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import updaterPkg from 'electron-updater';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,6 +45,41 @@ const broadcastWindowState = () => {
   if (!mainWindow) return;
   const state = mainWindow.isMaximized() ? 'maximized' : 'normal';
   mainWindow.webContents.send('window-state', state);
+};
+
+const { autoUpdater } = updaterPkg;
+
+const sendUpdateStatus = (status, payload = {}) => {
+  if (!mainWindow) return;
+  mainWindow.webContents.send('update-status', { status, ...payload });
+};
+
+const wireAutoUpdater = () => {
+  autoUpdater.autoDownload = true;
+
+  autoUpdater.on('checking-for-update', () => {
+    sendUpdateStatus('checking');
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    sendUpdateStatus('available', { info });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    sendUpdateStatus('not-available');
+  });
+
+  autoUpdater.on('error', (error) => {
+    sendUpdateStatus('error', { message: error?.message || 'Update error' });
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    sendUpdateStatus('downloading', { progress });
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    sendUpdateStatus('ready');
+  });
 };
 
 async function createWindow() {
@@ -113,9 +149,24 @@ ipcMain.handle('window-query-state', () => {
   return mainWindow.isMaximized() ? 'maximized' : 'normal';
 });
 
+ipcMain.handle('update-check', () => {
+  if (!isDev) {
+    return autoUpdater.checkForUpdates();
+  }
+  return null;
+});
+
+ipcMain.handle('update-install', () => {
+  autoUpdater.quitAndInstall();
+});
+
 app.whenReady().then(() => {
   startPythonServer();
   createWindow();
+  if (!isDev) {
+    wireAutoUpdater();
+    autoUpdater.checkForUpdatesAndNotify();
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

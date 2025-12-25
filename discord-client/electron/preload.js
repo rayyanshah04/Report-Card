@@ -16,4 +16,16 @@ contextBridge.exposeInMainWorld('desktop', {
     ipcRenderer.on('window-state', handler);
     return () => ipcRenderer.removeListener('window-state', handler);
   },
+  updates: {
+    onStatus: (callback) => {
+      if (typeof callback !== 'function') {
+        return () => {};
+      }
+      const handler = (_event, payload) => callback(payload);
+      ipcRenderer.on('update-status', handler);
+      return () => ipcRenderer.removeListener('update-status', handler);
+    },
+    check: () => ipcRenderer.invoke('update-check'),
+    install: () => ipcRenderer.invoke('update-install'),
+  },
 });

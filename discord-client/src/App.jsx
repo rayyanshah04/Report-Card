@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import MainLayout from './components/MainLayout';
 import ToastStack from './components/ToastStack';
@@ -13,6 +13,7 @@ import './styles/global.css';
 
 function App() {
   const logout = useAuthStore((state) => state.logout);
+  const [updateState, setUpdateState] = useState({ status: 'idle', progress: null, message: '' });
 
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -27,8 +28,61 @@ function App() {
     };
   }, [logout]);
 
+  useEffect(() => {
+    if (!window?.desktop?.updates?.onStatus) return;
+    const unsubscribe = window.desktop.updates.onStatus((payload) => {
+      setUpdateState({
+        status: payload.status || 'idle',
+        progress: payload.progress || null,
+        message: payload.message || '',
+      });
+    });
+    return () => unsubscribe?.();
+  }, []);
+
+  const handleInstallUpdate = () => {
+    window?.desktop?.updates?.install?.();
+  };
+
   return (
     <HashRouter>
+      {(updateState.status === 'checking' ||
+        updateState.status === 'available' ||
+        updateState.status === 'downloading' ||
+        updateState.status === 'ready' ||
+        updateState.status === 'error') && (
+        <div className="update-overlay">
+          <div className="update-card glass-surface">
+            <p className="eyebrow">Updating</p>
+            <h3>
+              {updateState.status === 'checking' && 'Checking for updates...'}
+              {updateState.status === 'available' && 'Update found. Downloading...'}
+              {updateState.status === 'downloading' && 'Downloading update...'}
+              {updateState.status === 'ready' && 'Update ready'}
+              {updateState.status === 'error' && 'Update error'}
+            </h3>
+            {updateState.status === 'downloading' && (
+              <>
+                <div className="update-progress">
+                  <div
+                    className="update-progress-bar"
+                    style={{ width: `${Math.round(updateState.progress?.percent || 0)}%` }}
+                  />
+                </div>
+                <p className="muted">{Math.round(updateState.progress?.percent || 0)}% downloaded</p>
+              </>
+            )}
+            {updateState.status === 'ready' && (
+              <button className="btn btn-primary" onClick={handleInstallUpdate}>
+                Restart & Update
+              </button>
+            )}
+            {updateState.status === 'error' && (
+              <p className="muted">{updateState.message || 'Update failed. Try again later.'}</p>
+            )}
+          </div>
+        </div>
+      )}
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<MainLayout />}>

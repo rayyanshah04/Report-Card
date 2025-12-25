@@ -666,6 +666,39 @@ textarea.input.dark:focus {
   justify-content: flex-start;
 }
 
+.update-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 10, 16, 0.6);
+  z-index: 40;
+}
+
+.update-card {
+  width: min(420px, 90vw);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.update-progress {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.update-progress-bar {
+  height: 100%;
+  background: linear-gradient(135deg, #5865f2, #4752c4);
+  width: 0%;
+  transition: width 0.2s ease;
+}
+
 .table-empty {
   padding: 32px;
   text-align: center;
