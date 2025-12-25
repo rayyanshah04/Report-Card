@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import logging
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
@@ -17,31 +18,53 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+def resolve_base_dir() -> Path:
+    env_base = os.getenv("FAIZAN_BASE_DIR")
+    if env_base:
+        return Path(env_base)
+    if getattr(sys, "frozen", False) and getattr(sys, "executable", None):
+        return Path(sys.executable).resolve().parent.parent
+    return Path(__file__).resolve().parent.parent
+
+
+BASE_DIR = resolve_base_dir()
+LOG_DIR = Path(os.getenv("LOCALAPPDATA") or BASE_DIR) / "FaizanReportStudio" / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = LOG_DIR / "backend.log"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE, encoding="utf-8"),
+        logging.StreamHandler(sys.stdout),
+    ],
+)
 if str(BASE_DIR) not in sys.path:
     sys.path.append(str(BASE_DIR))
 
 from backend.core.config_manager import ConfigManager
 from backend.core.pdf_manager import PDFManager
 from backend.core.helpers import calculate_age, calculate_years_studying, format_date
+from backend.core.db_config import load_db_config, save_db_config
 
 SAMPLE_EXCEL = BASE_DIR / "student_sample.xlsx"
 FILTERS_FILE = BASE_DIR / "settings" / "filters.json"
 REMARKS_FILE = BASE_DIR / "settings" / "remarks.json"
 
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_NAME = os.getenv("DB_NAME", "report_system")
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "rayyanshah04")
-
-
 def get_connection():
-    return psycopg2.connect(
-        host=DB_HOST,
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-    )
+    config = load_db_config()
+    try:
+        return psycopg2.connect(
+            host=os.getenv("DB_HOST", config.get("host")),
+            dbname=os.getenv("DB_NAME", config.get("dbname")),
+            user=os.getenv("DB_USER", config.get("user")),
+            password=os.getenv("DB_PASSWORD", config.get("password")),
+            port=int(os.getenv("DB_PORT", config.get("port", 5432))),
+        )
+    except Exception:
+        logging.exception("Database connection failed")
+        raise
 
 
 def row_to_dict(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -96,6 +119,14 @@ class FiltersPayload(BaseModel):
 
 class RemarksPayload(BaseModel):
     presets: list[str]
+
+
+class DbConfigPayload(BaseModel):
+    host: str
+    port: int = 5432
+    dbname: str
+    user: str
+    password: str
 
 
 class StudentUpdateRequest(BaseModel):
@@ -209,24 +240,40 @@ def health_check():
     return {"status": "ok"}
 
 
+@app.get("/db/config")
+def get_db_config():
+    return load_db_config()
+
+
+@app.put("/db/config")
+def update_db_config(payload: DbConfigPayload):
+    return save_db_config(payload.dict())
+
+
 @app.post("/auth/login")
 def login(payload: LoginRequest):
-    conn = get_connection()
-    cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
-    cursor.execute(
-        """
-        SELECT user_id, role FROM users 
-        WHERE username = %s AND password = %s AND is_active = TRUE
-        """,
-        (payload.username, payload.password),
-    )
-    user = cursor.fetchone()
-    conn.close()
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+        cursor.execute(
+            """
+            SELECT user_id, role FROM users 
+            WHERE username = %s AND password = %s AND is_active = TRUE
+            """,
+            (payload.username, payload.password),
+        )
+        user = cursor.fetchone()
+        conn.close()
 
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    return {"user_id": user["user_id"], "role": user["role"], "username": payload.username}
+        return {"user_id": user["user_id"], "role": user["role"], "username": payload.username}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.exception("Login failed")
+        raise HTTPException(status_code=500, detail=f"Login failed: {exc}")
 
 
 @app.get("/students")
@@ -586,7 +633,27 @@ async def import_students(file: UploadFile = File(...)):
 @app.get("/students/sample")
 def sample_excel():
     if not SAMPLE_EXCEL.exists():
-        raise HTTPException(status_code=404, detail="Sample file not found")
+        SAMPLE_EXCEL.parent.mkdir(parents=True, exist_ok=True)
+        sample = pd.DataFrame(
+            [
+                {
+                    "gr_no": "00001",
+                    "student_name": "Student Name",
+                    "current_class_sec": "KGIIA",
+                    "address": "Address",
+                    "contact_number_resident": "0000000000",
+                    "contact_number_neighbour": "",
+                    "contact_number_relative": "",
+                    "contact_number_other1": "",
+                    "contact_number_other2": "",
+                    "contact_number_other3": "",
+                    "contact_number_other4": "",
+                    "date_of_birth": "2015-01-01",
+                    "joining_date": "2020-06-01",
+                }
+            ]
+        )
+        sample.to_excel(SAMPLE_EXCEL, index=False)
     return FileResponse(SAMPLE_EXCEL, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
@@ -1423,4 +1490,4 @@ def download_pdf(file_name: str):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("backend.app:app", host="127.0.0.1", port=8000, reload=False)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)

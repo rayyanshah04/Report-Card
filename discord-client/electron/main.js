@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,19 +14,27 @@ const isDev = process.env.VITE_DEV_SERVER_URL;
 
 const ROOT_DIR = path.resolve(__dirname, '..', '..');
 const PYTHON_ENTRY = path.join(ROOT_DIR, 'backend', 'app.py');
+const BACKEND_EXE = path.join(process.resourcesPath, 'backend', 'report-backend.exe');
+const SHOULD_START_BACKEND = process.env.FAIZAN_START_BACKEND !== '0';
 
 function startPythonServer() {
+  if (!SHOULD_START_BACKEND) return;
   if (pythonServer) return;
   const env = {
     ...process.env,
     PYTHONPATH: `${process.env.PYTHONPATH ? `${process.env.PYTHONPATH}${path.delimiter}` : ''}${ROOT_DIR}`,
+    FAIZAN_BASE_DIR: app.isPackaged ? process.resourcesPath : ROOT_DIR,
   };
-  pythonServer = spawn('python', [PYTHON_ENTRY], {
-    cwd: ROOT_DIR,
-    stdio: 'inherit',
-    shell: false,
-    env,
-  });
+  if (app.isPackaged && fs.existsSync(BACKEND_EXE)) {
+    pythonServer = spawn(BACKEND_EXE, [], { stdio: 'inherit', shell: false, env });
+  } else {
+    pythonServer = spawn('python', [PYTHON_ENTRY], {
+      cwd: ROOT_DIR,
+      stdio: 'inherit',
+      shell: false,
+      env,
+    });
+  }
   pythonServer.on('close', () => {
     pythonServer = null;
   });
@@ -72,7 +81,7 @@ async function createWindow() {
     await mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    const indexHtml = path.join(ROOT_DIR, 'discord-client', 'dist', 'index.html');
+    const indexHtml = path.join(app.getAppPath(), 'dist', 'index.html');
     await mainWindow.loadFile(indexHtml);
   }
 }

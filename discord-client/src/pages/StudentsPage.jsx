@@ -6,7 +6,7 @@ import StudentEditModal from '../components/StudentEditModal';
 import FileUploadButton from '../components/FileUploadButton';
 import useStudentStore from '../store/studentStore';
 import useToast from '../hooks/useToast';
-import { API_BASE } from '../services/api';
+import { getApiBase } from '../services/api';
 
 const statusOptions = ['All', 'Active', 'Left', 'Inactive'];
 
@@ -96,7 +96,7 @@ export default function StudentsPage() {
   };
 
   const downloadSample = () => {
-    window.open(`${API_BASE}/students/sample`, '_blank', 'noopener');
+    window.open(`${getApiBase()}/students/sample`, '_blank', 'noopener');
   };
 
   const resetFilters = () => {

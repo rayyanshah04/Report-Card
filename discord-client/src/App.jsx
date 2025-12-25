@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import MainLayout from './components/MainLayout';
 import ToastStack from './components/ToastStack';
 import LoginPage from './pages/LoginPage';
@@ -28,7 +28,7 @@ function App() {
   }, [logout]);
 
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<MainLayout />}>
@@ -41,7 +41,7 @@ function App() {
         </Route>
       </Routes>
       <ToastStack />
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 

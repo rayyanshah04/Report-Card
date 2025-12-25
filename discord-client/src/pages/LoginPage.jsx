@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 import useToast from '../hooks/useToast';
+import api, { getApiBase, setApiBase } from '../services/api';
 
 export default function LoginPage() {
   const pushToast = useToast();
@@ -10,6 +11,42 @@ export default function LoginPage() {
   const loading = useAuthStore((state) => state.loading);
 
   const [credentials, setCredentials] = useState({ username: '', password: '' });
+  const [connectionOpen, setConnectionOpen] = useState(false);
+  const [serverInput, setServerInput] = useState(getApiBase());
+  const [healthStatus, setHealthStatus] = useState(null);
+
+  useEffect(() => {
+    if (!connectionOpen) {
+      setServerInput(getApiBase());
+      setHealthStatus(null);
+    }
+  }, [connectionOpen]);
+
+  const handleTestConnection = async () => {
+    try {
+      const response = await api.get('/health');
+      if (response.data?.status === 'ok') {
+        setHealthStatus('ok');
+        pushToast({ type: 'success', title: 'Connected', message: 'Server is reachable.' });
+      } else {
+        setHealthStatus('fail');
+        pushToast({ type: 'error', title: 'Not ready', message: 'Server responded unexpectedly.' });
+      }
+    } catch (error) {
+      setHealthStatus('fail');
+      pushToast({
+        type: 'error',
+        title: 'Connection failed',
+        message: error.response?.data?.detail || 'Could not reach the server.',
+      });
+    }
+  };
+
+  const handleSaveServer = () => {
+    const nextBase = setApiBase(serverInput);
+    setServerInput(nextBase);
+    pushToast({ type: 'success', title: 'Saved', message: `Server set to ${nextBase}.` });
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -63,7 +100,47 @@ export default function LoginPage() {
             {loading ? 'Authenticating…' : 'Enter Studio'}
           </button>
         </form>
+        <button className="btn btn-ghost" type="button" onClick={() => setConnectionOpen(true)}>
+          Connection Settings
+        </button>
       </div>
+      {connectionOpen && (
+        <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', overflow: 'hidden', zIndex: 20 }}>
+          <div className="modal-backdrop" onClick={() => setConnectionOpen(false)} />
+          <div className="modal-panel glass-surface" onClick={(e) => e.stopPropagation()}>
+            <header>
+              <div>
+                <p className="eyebrow">Connection</p>
+                <h3>Server endpoint</h3>
+              </div>
+              <button className="btn btn-text" onClick={() => setConnectionOpen(false)}>
+                Close
+              </button>
+            </header>
+            <label>
+              <span>API Base URL</span>
+              <input
+                className="input dark"
+                value={serverInput}
+                onChange={(event) => setServerInput(event.target.value)}
+                placeholder="http://127.0.0.1:8000"
+              />
+            </label>
+            <footer className="modal-footer">
+              <div className="remarks-actions">
+                <button className="btn btn-secondary" type="button" onClick={handleTestConnection}>
+                  Test Connection
+                </button>
+                {healthStatus === 'ok' && <span className="muted">Server reachable</span>}
+                {healthStatus === 'fail' && <span className="muted">Server unreachable</span>}
+              </div>
+              <button className="btn btn-primary" type="button" onClick={handleSaveServer}>
+                Save
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

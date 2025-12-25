@@ -3,6 +3,8 @@ PDF Manager - Handles PDF generation from HTML templates
 """
 
 from pathlib import Path
+import os
+import sys
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
@@ -11,7 +13,16 @@ from jinja2 import Environment, FileSystemLoader
 class PDFManager:
     """Manages PDF generation using Jinja2 templates and WeasyPrint"""
 
-    PROJECT_ROOT = Path(__file__).parent.parent.parent
+    @staticmethod
+    def resolve_project_root() -> Path:
+        env_base = os.getenv("FAIZAN_BASE_DIR")
+        if env_base:
+            return Path(env_base)
+        if getattr(sys, "frozen", False) and getattr(sys, "executable", None):
+            return Path(sys.executable).resolve().parent.parent
+        return Path(__file__).parent.parent.parent
+
+    PROJECT_ROOT = resolve_project_root.__func__()
     TEMPLATES_DIR = PROJECT_ROOT / "templates"
     OUTPUT_DIR = PROJECT_ROOT / "output"
 

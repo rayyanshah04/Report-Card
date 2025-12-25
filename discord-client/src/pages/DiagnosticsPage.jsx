@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import useToast from '../hooks/useToast';
-import api, { API_BASE } from '../services/api';
+import api, { getApiBase } from '../services/api';
 import RemarksModal from '../components/RemarksModal';
 import useDiagnosticsStore from '../store/diagnosticsStore';
 import useReportStore from '../store/reportStore';
@@ -428,7 +428,7 @@ export default function DiagnosticsPage() {
         <div className="panel-footer">
           <div className="pdf-meta">
             {pdfInfo ? (
-              <a className="link" href={`${API_BASE}${pdfInfo.download_url}`} target="_blank" rel="noreferrer">
+              <a className="link" href={`${getApiBase()}${pdfInfo.download_url}`} target="_blank" rel="noreferrer">
                 Download latest PDF
               </a>
             ) : (

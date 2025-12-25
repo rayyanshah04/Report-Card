@@ -8,9 +8,11 @@
     "dev": "concurrently \"npm:dev:renderer\" \"npm:dev:electron\"",
     "dev:renderer": "vite",
     "dev:electron": "wait-on http://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron ./electron/main.js",
-    "build": "npm run build:renderer && npm run build:electron",
+    "build": "npm run clean && npm run build:backend && npm run build:renderer && npm run build:electron",
+    "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
     "build:renderer": "vite build",
     "build:electron": "electron-builder",
+    "build:backend": "powershell -ExecutionPolicy Bypass -File ..\\backend\\build_backend.ps1",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -68,8 +70,8 @@
         "to": "templates"
       },
       {
-        "from": "../student_sample.xlsx",
-        "to": "assets/student_sample.xlsx"
+        "from": "../backend/dist/report-backend.exe",
+        "to": "backend/report-backend.exe"
       }
     ],
     "win": {
@@ -80,7 +82,12 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   }
 }

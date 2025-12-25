@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import useReportStore from '../store/reportStore';
 import useToast from '../hooks/useToast';
+import { getApiBase, setApiBase } from '../services/api';
+import api from '../services/api';
 
 const toLines = (items = []) => items.join('\n');
 const fromLines = (value) =>
@@ -31,12 +33,30 @@ export default function SettingsPage() {
   const [newSubjectType, setNewSubjectType] = useState('Core');
   const [editingSubject, setEditingSubject] = useState(null);
   const [subjectsExpanded, setSubjectsExpanded] = useState(false);
+  const [apiBaseInput, setApiBaseInput] = useState(getApiBase());
+  const [dbConfig, setDbConfig] = useState({
+    host: '192.168.0.205',
+    port: 5432,
+    dbname: 'report_system',
+    user: 'postgres',
+    password: 'rayyanshah04',
+  });
 
   useEffect(() => {
     if (!config && !loading) {
       fetchInitial();
     }
   }, [config, loading, fetchInitial]);
+
+  useEffect(() => {
+    api.get('/db/config')
+      .then((response) => {
+        setDbConfig(response.data);
+      })
+      .catch(() => {
+        // Ignore if backend not reachable yet.
+      });
+  }, []);
 
   useEffect(() => {
     if (config) {
@@ -124,6 +144,12 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSaveApiBase = () => {
+    const value = setApiBase(apiBaseInput);
+    setApiBaseInput(value);
+    toast({ type: 'success', title: 'Server saved', message: `API base set to ${value}.` });
+  };
+
   const handleClearResults = async () => {
     const confirmClear = window.confirm(
       'This will permanently delete all saved report results. Continue?',
@@ -141,8 +167,99 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSaveDbConfig = async () => {
+    try {
+      await api.put('/db/config', dbConfig);
+      toast({ type: 'success', title: 'DB Saved', message: 'Database settings updated.' });
+    } catch (error) {
+      toast({
+        type: 'error',
+        title: 'DB Save failed',
+        message: error.response?.data?.detail || 'Unable to update DB settings.',
+      });
+    }
+  };
+
   return (
     <div className="settings-page">
+      <section className="panel glass-surface">
+        <header className="panel-header">
+          <div>
+            <p className="eyebrow">Connection</p>
+            <h3>Server endpoint</h3>
+          </div>
+          <button className="btn btn-secondary" onClick={handleSaveApiBase}>
+            Save Server
+          </button>
+        </header>
+        <div className="settings-grid">
+          <label>
+            <span>API Base URL</span>
+            <input
+              className="input dark"
+              value={apiBaseInput}
+              onChange={(event) => setApiBaseInput(event.target.value)}
+              placeholder="http://127.0.0.1:8000"
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="panel glass-surface">
+        <header className="panel-header">
+          <div>
+            <p className="eyebrow">Database</p>
+            <h3>Postgres connection</h3>
+          </div>
+          <button className="btn btn-secondary" onClick={handleSaveDbConfig}>
+            Save DB
+          </button>
+        </header>
+        <div className="settings-grid">
+          <label>
+            <span>Host</span>
+            <input
+              className="input dark"
+              value={dbConfig.host}
+              onChange={(event) => setDbConfig((prev) => ({ ...prev, host: event.target.value }))}
+            />
+          </label>
+          <label>
+            <span>Port</span>
+            <input
+              className="input dark"
+              type="number"
+              value={dbConfig.port}
+              onChange={(event) => setDbConfig((prev) => ({ ...prev, port: Number(event.target.value) || 0 }))}
+            />
+          </label>
+          <label>
+            <span>Database</span>
+            <input
+              className="input dark"
+              value={dbConfig.dbname}
+              onChange={(event) => setDbConfig((prev) => ({ ...prev, dbname: event.target.value }))}
+            />
+          </label>
+          <label>
+            <span>User</span>
+            <input
+              className="input dark"
+              value={dbConfig.user}
+              onChange={(event) => setDbConfig((prev) => ({ ...prev, user: event.target.value }))}
+            />
+          </label>
+          <label>
+            <span>Password</span>
+            <input
+              className="input dark"
+              type="password"
+              value={dbConfig.password}
+              onChange={(event) => setDbConfig((prev) => ({ ...prev, password: event.target.value }))}
+            />
+          </label>
+        </div>
+      </section>
       <section className="panel glass-surface">
         <header className="panel-header">
           <div>
