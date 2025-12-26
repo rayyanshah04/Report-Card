@@ -134,6 +134,39 @@ const useStudentStore = create((set, get) => ({
       throw error;
     }
   },
+  previewImport: async (file) => {
+    if (!file) return null;
+    const formData = new FormData();
+    formData.append('file', file);
+    set({ importLoading: true });
+    try {
+      const response = await api.post('/students/import/preview', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      set({ importLoading: false });
+      return response.data;
+    } catch (error) {
+      set({ importLoading: false });
+      throw error;
+    }
+  },
+  applyImport: async (file, decisions) => {
+    if (!file) return null;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('decisions', JSON.stringify(decisions || []));
+    set({ importLoading: true });
+    try {
+      const response = await api.post('/students/import/apply', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      set({ importLoading: false });
+      return response.data;
+    } catch (error) {
+      set({ importLoading: false });
+      throw error;
+    }
+  },
   updateStudent: async (grNo, updates) => {
     if (!grNo || !updates) return;
     try {

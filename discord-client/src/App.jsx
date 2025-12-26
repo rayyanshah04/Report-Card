@@ -7,13 +7,18 @@ import StudentsPage from './pages/StudentsPage';
 import ReportsPage from './pages/ReportsPage';
 import DiagnosticsPage from './pages/DiagnosticsPage';
 import ResultsPage from './pages/ResultsPage';
+import PerformancePage from './pages/PerformancePage';
 import SettingsPage from './pages/SettingsPage';
 import useAuthStore from './store/authStore';
+import { getApiBase, setApiBase } from './services/api';
 import './styles/global.css';
 
 function App() {
   const logout = useAuthStore((state) => state.logout);
+  const user = useAuthStore((state) => state.user);
   const [updateState, setUpdateState] = useState({ status: 'idle', progress: null, message: '' });
+  const role = (user?.role || '').toLowerCase();
+  const isAdmin = role === 'admin';
 
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -27,6 +32,16 @@ function App() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [logout]);
+
+  useEffect(() => {
+    if (import.meta.env.DEV) return;
+    if (!window?.desktop?.version?.electron) return;
+    const expected = 'http://127.0.0.1:8000';
+    const current = getApiBase();
+    if (current !== expected) {
+      setApiBase(expected);
+    }
+  }, []);
 
   useEffect(() => {
     if (!window?.desktop?.updates?.onStatus) return;
@@ -85,8 +100,15 @@ function App() {
           <Route path="/students" element={<StudentsPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/results" element={<ResultsPage />} />
+          <Route
+            path="/performance"
+            element={isAdmin ? <PerformancePage /> : <Navigate to="/students" replace />}
+          />
           <Route path="/diagnostics" element={<DiagnosticsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route
+            path="/settings"
+            element={isAdmin ? <SettingsPage /> : <Navigate to="/students" replace />}
+          />
         </Route>
       </Routes>
       <ToastStack />

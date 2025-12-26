@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import api from '../services/api';
+import api, { setAuthContext } from '../services/api';
 
 const useAuthStore = create(
   persist(
@@ -12,6 +12,7 @@ const useAuthStore = create(
         set({ loading: true, error: null });
         try {
           const response = await api.post('/auth/login', { username, password });
+          setAuthContext(response.data);
           set({ user: response.data, loading: false });
           return response.data;
         } catch (error) {
@@ -21,6 +22,7 @@ const useAuthStore = create(
         }
       },
       logout: () => {
+        setAuthContext(null);
         set({ user: null });
       },
     }),
@@ -28,6 +30,11 @@ const useAuthStore = create(
       name: 'faizan-report-user', // storage name
       storage: createJSONStorage(() => localStorage), // use localStorage
       partialize: (state) => ({ user: state.user }), // only persist the 'user' state
+      onRehydrateStorage: () => (state) => {
+        if (state?.user) {
+          setAuthContext(state.user);
+        }
+      },
     },
   ),
 );

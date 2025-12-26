@@ -53,8 +53,22 @@ const navItems = [
     ),
   },
   {
+    to: '/performance',
+    label: 'Performance',
+    adminOnly: true,
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <path d="M4 18V6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        <path d="M9 18V10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        <path d="M14 18V4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        <path d="M19 18V8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     to: '/settings',
     label: 'Settings',
+    adminOnly: true,
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24">
         <path
@@ -68,6 +82,8 @@ const navItems = [
 
 export default function Sidebar() {
   const user = useAuthStore((state) => state.user);
+  const role = (user?.role || '').toLowerCase();
+  const isAdmin = role === 'admin';
   const initials = user?.username?.slice(0, 2)?.toUpperCase() || 'FA';
   return (
     <aside className="sidebar">
@@ -75,16 +91,18 @@ export default function Sidebar() {
         <span>{initials}</span>
       </div>
       <nav className="sidebar__nav">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) => clsx('sidebar__button', isActive && 'sidebar__button--active')}
-          >
-            <span className="sidebar__icon">{item.icon}</span>
-            <span className="sidebar__tooltip">{item.label}</span>
-          </NavLink>
-        ))}
+        {navItems
+          .filter((item) => !item.adminOnly || isAdmin)
+          .map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) => clsx('sidebar__button', isActive && 'sidebar__button--active')}
+            >
+              <span className="sidebar__icon">{item.icon}</span>
+              <span className="sidebar__tooltip">{item.label}</span>
+            </NavLink>
+          ))}
       </nav>
     </aside>
   );

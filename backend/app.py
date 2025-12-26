@@ -5,14 +5,16 @@ import os
 import sys
 import logging
 from datetime import datetime
+import re
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, Optional
+from collections import defaultdict
 
 import pandas as pd
 import psycopg2
 from psycopg2 import extras
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -83,8 +85,138 @@ def get_connection():
         raise
 
 
+def require_admin(request: Request):
+    role = request.headers.get("x-user-role", "").lower()
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+
+def ensure_user_exists(user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+    cursor.execute("SELECT user_id, role FROM users WHERE user_id = %s", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found")
+    return row
+
+
+def set_user_teacher_role(user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE users SET role = 'teacher'
+        WHERE user_id = %s AND role != 'admin'
+        """,
+        (user_id,),
+    )
+    conn.commit()
+    conn.close()
+
+
 def row_to_dict(row: Dict[str, Any]) -> Dict[str, Any]:
     return {key: row[key] for key in row.keys()}
+
+
+def migrate_principal_roles():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET role = 'admin' WHERE role = 'principal'")
+    conn.commit()
+    conn.close()
+
+
+DATE_COLUMNS = {"date_of_birth"}
+
+
+def normalize_cell(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if text.lower() in {"", "none", "null", "nan"}:
+        return None
+    return text
+
+
+def parse_date(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if hasattr(value, "date") and callable(getattr(value, "date")):
+        try:
+            return value.date().isoformat()
+        except Exception:
+            pass
+    text = normalize_cell(value)
+    if not text:
+        return None
+    parts = [p for p in re.split(r"\D+", text) if p]
+    if len(parts) != 3:
+        return None
+    try:
+        nums = [int(p) for p in parts]
+    except ValueError:
+        return None
+    yearfirst = len(parts[0]) == 4
+    if yearfirst:
+        year, month, day = nums
+    else:
+        dayfirst = None
+        if nums[0] > 12 and nums[1] <= 12:
+            dayfirst = True
+        elif nums[1] > 12 and nums[0] <= 12:
+            dayfirst = False
+        elif len(parts[2]) == 4:
+            dayfirst = True
+        else:
+            dayfirst = True
+        if dayfirst:
+            day, month, year = nums
+        else:
+            month, day, year = nums
+        if year < 100:
+            year += 2000 if year < 50 else 1900
+    try:
+        return datetime(year, month, day).date().isoformat()
+    except ValueError:
+        return None
+
+
+def normalize_value(value: Any, column: str) -> Optional[str]:
+    if column in DATE_COLUMNS:
+        return parse_date(value)
+    return normalize_cell(value)
+
+
+def extract_student_rows(content: bytes) -> tuple[list[Dict[str, Optional[str]]], list[Optional[str]]]:
+    try:
+        df = pd.read_excel(BytesIO(content))
+    except Exception as exc:  # pragma: no cover - pandas raises many error types
+        raise HTTPException(status_code=400, detail=f"Unable to read Excel file: {exc}") from exc
+
+    for column in REQUIRED_STUDENT_COLUMNS:
+        if column not in df.columns:
+            raise HTTPException(status_code=400, detail=f"Missing column: {column}")
+
+    rows = []
+    row_errors: list[Optional[str]] = []
+    for _, row in df.iterrows():
+        error = None
+        row_data = {}
+        for column in REQUIRED_STUDENT_COLUMNS:
+            value = row.get(column) if pd.notna(row.get(column)) else None
+            normalized = normalize_value(value, column)
+            if column in DATE_COLUMNS and value and not normalized:
+                error = f"Invalid date in {column}: {value}"
+            row_data[column] = normalized
+        if row_data.get("gr_no"):
+            row_data["gr_no"] = str(row_data["gr_no"]).strip()
+        rows.append(row_data)
+        row_errors.append(error)
+    return rows, row_errors
 
 
 class LoginRequest(BaseModel):
@@ -143,6 +275,42 @@ class DbConfigPayload(BaseModel):
     dbname: str
     user: str
     password: str
+
+
+class UserCreatePayload(BaseModel):
+    username: str
+    password: str
+    role: str = "teacher"
+
+
+class UserUpdatePayload(BaseModel):
+    username: Optional[str] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class PasswordResetPayload(BaseModel):
+    password: str
+
+
+class PasswordChangePayload(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class UserAccountPayload(BaseModel):
+    username: str
+    password: str
+    role: str = "teacher"
+    full_name: str
+
+
+class UserAccountUpdatePayload(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+    full_name: Optional[str] = None
 
 
 class StudentUpdateRequest(BaseModel):
@@ -241,6 +409,7 @@ def initialize_report_queue():
         ensure_report_queue_table()
         ensure_report_results_table()
         ensure_diagnostics_queue_table()
+        migrate_principal_roles()
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM report_queue")
@@ -632,21 +801,20 @@ async def import_students(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Please upload an Excel file (.xlsx or .xls)")
 
     content = await file.read()
-    try:
-        df = pd.read_excel(BytesIO(content))
-    except Exception as exc:  # pragma: no cover - pandas raises many error types
-        raise HTTPException(status_code=400, detail=f"Unable to read Excel file: {exc}") from exc
-
-    for column in REQUIRED_STUDENT_COLUMNS:
-        if column not in df.columns:
-            raise HTTPException(status_code=400, detail=f"Missing column: {column}")
+    rows, row_errors = extract_student_rows(content)
 
     conn = get_connection()
     cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
     success = 0
     errors: list[str] = []
 
-    for idx, row in df.iterrows():
+    for idx, row in enumerate(rows):
+        if row_errors[idx]:
+            errors.append(f"Row {idx + 2}: {row_errors[idx]}")
+            continue
+        if not row.get("gr_no"):
+            errors.append(f"Row {idx + 2}: Missing G.R No")
+            continue
         try:
             cursor.execute(
                 """
@@ -658,10 +826,7 @@ async def import_students(file: UploadFile = File(...)):
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                tuple(
-                    str(row.get(column)) if pd.notna(row.get(column)) else None
-                    for column in REQUIRED_STUDENT_COLUMNS
-                ),
+                    tuple(row.get(column) for column in REQUIRED_STUDENT_COLUMNS),
             )
             success += 1
         except psycopg2.IntegrityError:
@@ -675,14 +840,244 @@ async def import_students(file: UploadFile = File(...)):
     return {"imported": success, "errors": errors}
 
 
+@app.post("/students/import/preview")
+async def preview_import(file: UploadFile = File(...)):
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Please upload an Excel file (.xlsx or .xls)")
+
+    content = await file.read()
+    rows, row_errors = extract_student_rows(content)
+
+    gr_nos = [row.get("gr_no") for row in rows if row.get("gr_no")]
+    dup_counts = {}
+    for gr_no in gr_nos:
+        dup_counts[gr_no] = dup_counts.get(gr_no, 0) + 1
+    duplicates = {gr_no for gr_no, count in dup_counts.items() if count > 1}
+
+    existing = {}
+    if gr_nos:
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+        cursor.execute(
+            f"""
+            SELECT {", ".join(REQUIRED_STUDENT_COLUMNS)}
+            FROM students
+            WHERE gr_no = ANY(%s)
+            """,
+            (gr_nos,),
+        )
+        for row in cursor.fetchall():
+            existing[row["gr_no"]] = row_to_dict(row)
+        conn.close()
+
+    preview_rows = []
+    counts = {"new": 0, "update": 0, "conflict": 0, "skip": 0, "error": 0}
+
+    for idx, row in enumerate(rows):
+        gr_no = row.get("gr_no")
+        entry = {
+            "rowIndex": idx + 2,
+            "gr_no": gr_no,
+            "status": "new",
+            "diffs": {},
+            "name_conflict": False,
+            "excel": row,
+            "db": existing.get(gr_no),
+            "error": None,
+        }
+
+        if row_errors[idx]:
+            entry["status"] = "error"
+            entry["error"] = row_errors[idx]
+            counts["error"] += 1
+            preview_rows.append(entry)
+            continue
+
+        if not gr_no:
+            entry["status"] = "error"
+            entry["error"] = "Missing G.R No"
+            counts["error"] += 1
+            preview_rows.append(entry)
+            continue
+
+        if gr_no in duplicates:
+            entry["status"] = "error"
+            entry["error"] = "Duplicate G.R No in file"
+            counts["error"] += 1
+            preview_rows.append(entry)
+            continue
+
+        if gr_no not in existing:
+            entry["status"] = "new"
+            counts["new"] += 1
+            preview_rows.append(entry)
+            continue
+
+        db_row = existing[gr_no]
+        diffs = {}
+        for column in REQUIRED_STUDENT_COLUMNS:
+            excel_val = row.get(column)
+            db_val = db_row.get(column)
+            if normalize_value(excel_val, column) != normalize_value(db_val, column):
+                diffs[column] = {"excel": excel_val, "db": db_val}
+
+        if not diffs:
+            entry["status"] = "skip"
+            counts["skip"] += 1
+        else:
+            entry["status"] = "update"
+            counts["update"] += 1
+            if "student_name" in diffs:
+                entry["status"] = "conflict"
+                entry["name_conflict"] = True
+                counts["conflict"] += 1
+                counts["update"] -= 1
+
+        entry["diffs"] = diffs
+        preview_rows.append(entry)
+
+    return {
+        "summary": {
+            "total": len(rows),
+            "new": counts["new"],
+            "update": counts["update"],
+            "conflict": counts["conflict"],
+            "skip": counts["skip"],
+            "error": counts["error"],
+        },
+        "rows": preview_rows,
+    }
+
+
+@app.post("/students/import/apply")
+async def apply_import(file: UploadFile = File(...), decisions: str = Form(...)):
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Please upload an Excel file (.xlsx or .xls)")
+
+    content = await file.read()
+    rows, row_errors = extract_student_rows(content)
+    try:
+        decision_data = json.loads(decisions)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid decisions payload: {exc}") from exc
+
+    decision_map = {item.get("gr_no"): item for item in decision_data or []}
+    gr_nos = [row.get("gr_no") for row in rows if row.get("gr_no")]
+
+    existing = {}
+    if gr_nos:
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+        cursor.execute(
+            f"""
+            SELECT {", ".join(REQUIRED_STUDENT_COLUMNS)}
+            FROM students
+            WHERE gr_no = ANY(%s)
+            """,
+            (gr_nos,),
+        )
+        for row in cursor.fetchall():
+            existing[row["gr_no"]] = row_to_dict(row)
+    else:
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+
+    applied = {"inserted": 0, "updated": 0, "skipped": 0, "errors": 0}
+    errors = []
+    seen = set()
+
+    for idx, row in enumerate(rows):
+        gr_no = row.get("gr_no")
+        if row_errors[idx]:
+            applied["errors"] += 1
+            errors.append(f"Row {idx + 2}: {row_errors[idx]}")
+            continue
+        if not gr_no:
+            applied["errors"] += 1
+            errors.append(f"Row {idx + 2}: Missing G.R No")
+            continue
+        if gr_no in seen:
+            applied["errors"] += 1
+            errors.append(f"Row {idx + 2}: Duplicate G.R No in file")
+            continue
+        seen.add(gr_no)
+
+        decision = decision_map.get(gr_no, {})
+        action = decision.get("action", "skip")
+        name_choice = decision.get("nameChoice", "excel")
+
+        if action == "skip":
+            applied["skipped"] += 1
+            continue
+
+        exists = gr_no in existing
+        if exists:
+            if action == "insert":
+                applied["errors"] += 1
+                errors.append(f"Row {idx + 2}: G.R No already exists (cannot insert)")
+                continue
+            if name_choice == "db":
+                row["student_name"] = existing[gr_no].get("student_name")
+
+            try:
+                cursor.execute(
+                    f"""
+                    UPDATE students
+                    SET {", ".join([f"{col} = %s" for col in REQUIRED_STUDENT_COLUMNS if col != "gr_no"])}
+                    WHERE gr_no = %s
+                    """,
+                    tuple(
+                        row.get(col) for col in REQUIRED_STUDENT_COLUMNS if col != "gr_no"
+                    )
+                    + (gr_no,),
+                )
+                applied["updated"] += 1
+            except Exception as exc:
+                applied["errors"] += 1
+                errors.append(f"Row {idx + 2}: {exc}")
+        else:
+            if action == "skip":
+                applied["skipped"] += 1
+                continue
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO students (
+                        gr_no, student_name, father_name, current_class_sec, current_session,
+                        date_of_birth, contact_number_resident, contact_number_neighbour,
+                        contact_number_relative, contact_number_other1, contact_number_other2,
+                        contact_number_other3, contact_number_other4, address
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    tuple(row.get(column) for column in REQUIRED_STUDENT_COLUMNS),
+                )
+                applied["inserted"] += 1
+            except Exception as exc:
+                applied["errors"] += 1
+                errors.append(f"Row {idx + 2}: {exc}")
+
+    conn.commit()
+    conn.close()
+
+    return {"status": "ok", "applied": applied, "errors": errors}
+
+
 @app.get("/subjects")
 def list_subjects():
     conn = get_connection()
     cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
-    cursor.execute("SELECT subject_name, type FROM subjects ORDER BY subject_name")
+    cursor.execute("SELECT subject_id, subject_name, type FROM subjects ORDER BY subject_name")
     rows = cursor.fetchall()
     conn.close()
-    return [{"subject_name": row["subject_name"], "type": row["type"]} for row in rows]
+    return [
+        {
+            "subject_id": row["subject_id"],
+            "subject_name": row["subject_name"],
+            "type": row["type"],
+        }
+        for row in rows
+    ]
 
 
 class SubjectCreateRequest(BaseModel):
@@ -1048,6 +1443,401 @@ def report_history_all():
             }
         )
     return {"items": items}
+
+
+@app.get("/admin/users")
+def list_users(request: Request):
+    require_admin(request)
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+    cursor.execute(
+        """
+        SELECT user_id, username, role, password, is_active, created_at
+        FROM users
+        ORDER BY LOWER(username)
+        """
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return {"users": [row_to_dict(row) for row in rows]}
+
+
+@app.get("/admin/user-accounts")
+def list_user_accounts(request: Request):
+    require_admin(request)
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+    cursor.execute(
+        """
+        SELECT user_id, username, role, password, is_active, full_name
+        FROM users
+        ORDER BY LOWER(username)
+        """
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return {"users": [row_to_dict(row) for row in rows]}
+
+
+@app.post("/admin/user-accounts")
+def create_user_account(payload: UserAccountPayload, request: Request):
+    require_admin(request)
+    if payload.role not in {"admin", "teacher"}:
+        raise HTTPException(status_code=400, detail="Invalid role")
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+    try:
+        cursor.execute(
+            """
+            INSERT INTO users (username, password, role, is_active, full_name)
+            VALUES (%s, %s, %s, TRUE, %s)
+            RETURNING user_id, username, role, password, is_active, full_name
+            """,
+            (payload.username.strip(), payload.password, payload.role, payload.full_name.strip()),
+        )
+        user = cursor.fetchone()
+        conn.commit()
+        return user
+    except psycopg2.IntegrityError:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail="Username already exists")
+    finally:
+        conn.close()
+
+
+@app.put("/admin/user-accounts/{user_id}")
+def update_user_account(user_id: int, payload: UserAccountUpdatePayload, request: Request):
+    require_admin(request)
+    updates = []
+    params = []
+    if payload.username is not None:
+        updates.append("username = %s")
+        params.append(payload.username.strip())
+    if payload.role is not None:
+        if payload.role not in {"admin", "teacher"}:
+            raise HTTPException(status_code=400, detail="Invalid role")
+        updates.append("role = %s")
+        params.append(payload.role)
+    if payload.password is not None:
+        updates.append("password = %s")
+        params.append(payload.password)
+    if payload.is_active is not None:
+        updates.append("is_active = %s")
+        params.append(payload.is_active)
+    if payload.full_name is not None:
+        updates.append("full_name = %s")
+        params.append(payload.full_name.strip())
+
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+    try:
+        if updates:
+            params.append(user_id)
+            cursor.execute(
+                f"""
+                UPDATE users
+                SET {", ".join(updates)}
+                WHERE user_id = %s
+                RETURNING user_id, username, role, password, is_active
+                """,
+                params,
+            )
+            user = cursor.fetchone()
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+        else:
+            cursor.execute(
+                "SELECT user_id, username, role, password, is_active FROM users WHERE user_id = %s",
+                (user_id,),
+            )
+            user = cursor.fetchone()
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+
+        conn.commit()
+        return user
+    except psycopg2.IntegrityError:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail="Username already exists")
+    finally:
+        conn.close()
+
+
+@app.post("/admin/users")
+def create_user(payload: UserCreatePayload, request: Request):
+    require_admin(request)
+    if payload.role not in {"admin", "teacher"}:
+        raise HTTPException(status_code=400, detail="Invalid role")
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+    try:
+        cursor.execute(
+            """
+            INSERT INTO users (username, password, role, is_active)
+            VALUES (%s, %s, %s, TRUE)
+            RETURNING user_id, username, role, is_active
+            """,
+            (payload.username.strip(), payload.password, payload.role),
+        )
+        user = cursor.fetchone()
+        conn.commit()
+        return user
+    except psycopg2.IntegrityError:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail="Username already exists")
+    finally:
+        conn.close()
+
+
+@app.put("/admin/users/{user_id}")
+def update_user(user_id: int, payload: UserUpdatePayload, request: Request):
+    require_admin(request)
+    updates = []
+    params = []
+    if payload.username is not None:
+        updates.append("username = %s")
+        params.append(payload.username.strip())
+    if payload.role is not None:
+        if payload.role not in {"admin", "teacher"}:
+            raise HTTPException(status_code=400, detail="Invalid role")
+        updates.append("role = %s")
+        params.append(payload.role)
+    if payload.is_active is not None:
+        updates.append("is_active = %s")
+        params.append(payload.is_active)
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    params.append(user_id)
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+    try:
+        cursor.execute(
+            f"""
+            UPDATE users
+            SET {", ".join(updates)}
+            WHERE user_id = %s
+            RETURNING user_id, username, role, is_active
+            """,
+            params,
+        )
+        user = cursor.fetchone()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        conn.commit()
+        return user
+    except psycopg2.IntegrityError:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail="Username already exists")
+    finally:
+        conn.close()
+
+
+@app.put("/admin/users/{user_id}/password")
+def reset_user_password(user_id: int, payload: PasswordResetPayload, request: Request):
+    require_admin(request)
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+    cursor.execute(
+        """
+        UPDATE users
+        SET password = %s
+        WHERE user_id = %s
+        RETURNING user_id, username
+        """,
+        (payload.password, user_id),
+    )
+    user = cursor.fetchone()
+    conn.commit()
+    conn.close()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"status": "ok", "user_id": user["user_id"], "username": user["username"]}
+
+
+@app.put("/users/me/password")
+def change_own_password(payload: PasswordChangePayload, request: Request):
+    username = request.headers.get("x-user-name")
+    if not username:
+        raise HTTPException(status_code=401, detail="Missing user context")
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+    cursor.execute(
+        """
+        SELECT user_id FROM users WHERE username = %s AND password = %s
+        """,
+        (username, payload.current_password),
+    )
+    user = cursor.fetchone()
+    if not user:
+        conn.close()
+        raise HTTPException(status_code=401, detail="Current password incorrect")
+    cursor.execute(
+        """
+        UPDATE users SET password = %s WHERE user_id = %s
+        """,
+        (payload.new_password, user["user_id"]),
+    )
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+
+@app.get("/reports/analytics")
+def report_analytics(
+    session: Optional[str] = None,
+    class_sec: Optional[str] = None,
+    term: Optional[str] = None,
+    search: Optional[str] = None,
+):
+    def parse_pct(value: Any) -> float:
+        if value is None:
+            return 0.0
+        if isinstance(value, (int, float)):
+            return float(value)
+        text = str(value).strip().replace("%", "")
+        try:
+            return float(text)
+        except ValueError:
+            return 0.0
+
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=extras.RealDictCursor)
+
+    query = """
+        SELECT id, gr_no, student_name, class_sec, session, term, created_at, payload
+        FROM report_results
+    """
+    clauses = []
+    params: list[Any] = []
+    if session:
+        clauses.append("session = %s")
+        params.append(session)
+    if class_sec:
+        clauses.append("class_sec = %s")
+        params.append(class_sec)
+    if term:
+        clauses.append("term = %s")
+        params.append(term)
+    if search:
+        like = f"%{search}%"
+        clauses.append("(student_name ILIKE %s OR gr_no ILIKE %s)")
+        params.extend([like, like])
+
+    if clauses:
+        query += " WHERE " + " AND ".join(clauses)
+
+    query += " ORDER BY created_at DESC"
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    conn.close()
+
+    grade_counts: dict[str, int] = defaultdict(int)
+    session_agg: dict[str, dict[str, float]] = defaultdict(lambda: {"count": 0, "sum_pct": 0.0})
+    class_agg: dict[str, dict[str, float]] = defaultdict(lambda: {"count": 0, "sum_pct": 0.0})
+    term_agg: dict[str, dict[str, float]] = defaultdict(lambda: {"count": 0, "sum_pct": 0.0})
+    timeline_agg: dict[str, dict[str, float]] = defaultdict(lambda: {"count": 0, "sum_pct": 0.0})
+    subject_agg: dict[str, dict[str, float]] = defaultdict(lambda: {"count": 0, "sum_pct": 0.0})
+    available_sessions = set()
+    available_classes = set()
+    available_terms = set()
+
+    total_pct = 0.0
+    total_count = 0
+    recent = []
+
+    for row in rows:
+        payload = row.get("payload") or {}
+        totals = payload.get("grand_totals") or {}
+        pct = parse_pct(totals.get("pct"))
+        grade = totals.get("grade") or "N/A"
+
+        total_pct += pct
+        total_count += 1
+        grade_counts[grade] += 1
+
+        session_key = row.get("session") or "Unknown"
+        class_key = row.get("class_sec") or "Unknown"
+        term_key = row.get("term") or "Unknown"
+        timeline_key = f"{session_key} | {term_key}"
+
+        session_agg[session_key]["count"] += 1
+        session_agg[session_key]["sum_pct"] += pct
+        class_agg[class_key]["count"] += 1
+        class_agg[class_key]["sum_pct"] += pct
+        term_agg[term_key]["count"] += 1
+        term_agg[term_key]["sum_pct"] += pct
+        timeline_agg[timeline_key]["count"] += 1
+        timeline_agg[timeline_key]["sum_pct"] += pct
+
+        available_sessions.add(session_key)
+        available_classes.add(class_key)
+        available_terms.add(term_key)
+
+        marks_data = payload.get("marks_data") or {}
+        if isinstance(marks_data, dict):
+            for subject, data in marks_data.items():
+                subject_pct = parse_pct((data or {}).get("pct"))
+                subject_agg[subject]["count"] += 1
+                subject_agg[subject]["sum_pct"] += subject_pct
+
+        recent.append(
+            {
+                "id": row.get("id"),
+                "gr_no": row.get("gr_no"),
+                "student_name": row.get("student_name"),
+                "class_sec": row.get("class_sec"),
+                "session": row.get("session"),
+                "term": row.get("term"),
+                "pct": round(pct, 1),
+                "grade": grade,
+                "created_at": row.get("created_at"),
+            }
+        )
+
+    def agg_to_list(source: dict[str, dict[str, float]], key_name: str) -> list[dict[str, Any]]:
+        items = []
+        for key, data in source.items():
+            count = data["count"]
+            avg_pct = round(data["sum_pct"] / count, 1) if count else 0.0
+            items.append({key_name: key, "count": count, "avg_pct": avg_pct})
+        return sorted(items, key=lambda item: (-item["count"], item[key_name]))
+
+    summary = {
+        "total_results": total_count,
+        "avg_pct": round(total_pct / total_count, 1) if total_count else 0.0,
+        "grade_counts": dict(grade_counts),
+    }
+
+    response = {
+        "summary": summary,
+        "sessions": agg_to_list(session_agg, "session"),
+        "classes": agg_to_list(class_agg, "class_sec"),
+        "terms": agg_to_list(term_agg, "term"),
+        "timeline": agg_to_list(timeline_agg, "period"),
+        "subjects": agg_to_list(subject_agg, "subject"),
+        "recent": recent[:50],
+        "available": {
+            "sessions": sorted(available_sessions),
+            "classes": sorted(available_classes),
+            "terms": sorted(available_terms),
+        },
+    }
+
+    if search:
+        response["student_trend"] = [
+            {
+                "session": item.get("session"),
+                "term": item.get("term"),
+                "pct": item.get("pct"),
+                "grade": item.get("grade"),
+                "created_at": item.get("created_at"),
+            }
+            for item in reversed(recent)
+        ]
+
+    return response
 
 
 @app.get("/reports/history-term")

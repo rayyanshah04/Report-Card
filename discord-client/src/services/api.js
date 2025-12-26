@@ -23,3 +23,10 @@ const api = axios.create({
 });
 
 export default api;
+
+export function setAuthContext(user) {
+  const role = user?.role || '';
+  const name = user?.username || '';
+  api.defaults.headers.common['x-user-role'] = role;
+  api.defaults.headers.common['x-user-name'] = name;
+}

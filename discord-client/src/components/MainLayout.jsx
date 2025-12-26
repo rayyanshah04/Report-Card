@@ -20,6 +20,11 @@ const routeMeta = [
     subtitle: 'Browse every saved report by session, class, and term.',
   },
   {
+    path: '/performance',
+    title: 'Performance Atlas',
+    subtitle: 'Track class trends, grade distribution, and student growth.',
+  },
+  {
     path: '/diagnostics',
     title: 'Diagnostics Lab',
     subtitle: 'Capture skill-by-skill diagnostics with quick ratings and comments.',

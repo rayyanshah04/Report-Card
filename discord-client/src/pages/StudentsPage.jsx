@@ -4,6 +4,7 @@ import StudentTable from '../components/StudentTable';
 import StudentDetailDrawer from '../components/StudentDetailDrawer';
 import StudentEditModal from '../components/StudentEditModal';
 import FileUploadButton from '../components/FileUploadButton';
+import ImportPreviewModal from '../components/ImportPreviewModal';
 import useStudentStore from '../store/studentStore';
 import useToast from '../hooks/useToast';
 import api from '../services/api';
@@ -32,7 +33,8 @@ export default function StudentsPage() {
   const fetchStudentDetail = useStudentStore((state) => state.fetchStudentDetail);
   const fetchReportHistory = useStudentStore((state) => state.fetchReportHistory);
   const downloadReportHistoryPdf = useStudentStore((state) => state.downloadReportHistoryPdf);
-  const importStudents = useStudentStore((state) => state.importStudents);
+  const previewImport = useStudentStore((state) => state.previewImport);
+  const applyImport = useStudentStore((state) => state.applyImport);
   const importLoading = useStudentStore((state) => state.importLoading);
   const clearDetail = useStudentStore((state) => state.clearDetail);
   const updateStudent = useStudentStore((state) => state.updateStudent);
@@ -44,6 +46,9 @@ export default function StudentsPage() {
 
   const [saveLoading, setSaveLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [importPreview, setImportPreview] = useState(null);
+  const [importFile, setImportFile] = useState(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   useEffect(() => {
     fetchStats();
@@ -79,13 +84,28 @@ export default function StudentsPage() {
 
   const handleImport = async (file) => {
     try {
-      const result = await importStudents(file);
+      const preview = await previewImport(file);
+      setImportPreview(preview);
+      setImportFile(file);
+      setImportModalOpen(true);
+    } catch (error) {
+      toast({ type: 'error', title: 'Import failed', message: error.response?.data?.detail || 'Could not import file' });
+    }
+  };
+
+  const handleConfirmImport = async (decisions) => {
+    if (!importFile) return;
+    try {
+      const result = await applyImport(importFile, decisions);
+      setImportModalOpen(false);
+      setImportPreview(null);
+      setImportFile(null);
       toast({
         type: 'success',
         title: 'Import complete',
-        message: `Imported ${result.imported} students${result.errors.length ? `, ${result.errors.length} failed` : ''}.`,
+        message: `Inserted ${result.applied.inserted}, updated ${result.applied.updated}, skipped ${result.applied.skipped}.`,
       });
-      if (result.errors.length) {
+      if (result.errors?.length) {
         console.warn('Import errors', result.errors);
       }
       fetchStudents(filters);
@@ -393,6 +413,16 @@ export default function StudentsPage() {
         onDelete={handleDeleteStudent}
         deleteLoading={deleteLoading}
         loading={saveLoading}
+      />
+      <ImportPreviewModal
+        open={importModalOpen}
+        preview={importPreview}
+        onConfirm={handleConfirmImport}
+        onClose={() => {
+          setImportModalOpen(false);
+          setImportPreview(null);
+          setImportFile(null);
+        }}
       />
     </div >
   );

@@ -14,6 +14,8 @@ export default function LoginPage() {
   const [connectionOpen, setConnectionOpen] = useState(false);
   const [serverInput, setServerInput] = useState(getApiBase());
   const [healthStatus, setHealthStatus] = useState(null);
+  const [serverReady, setServerReady] = useState(false);
+  const [serverChecking, setServerChecking] = useState(true);
 
   useEffect(() => {
     if (!connectionOpen) {
@@ -21,6 +23,38 @@ export default function LoginPage() {
       setHealthStatus(null);
     }
   }, [connectionOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const pollHealth = async () => {
+      setServerChecking(true);
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        try {
+          const response = await api.get('/health');
+          if (response.data?.status === 'ok') {
+            if (!cancelled) {
+              setServerReady(true);
+              setServerChecking(false);
+            }
+            return;
+          }
+        } catch (_error) {
+          // Ignore until backend is ready.
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      if (!cancelled) {
+        setServerReady(false);
+        setServerChecking(false);
+      }
+    };
+
+    pollHealth();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleTestConnection = async () => {
     try {
@@ -81,6 +115,7 @@ export default function LoginPage() {
             <input
               className="input dark"
               type="text"
+              disabled={!serverReady}
               value={credentials.username}
               onChange={(event) => setCredentials((prev) => ({ ...prev, username: event.target.value }))}
               placeholder="e.g., admin"
@@ -91,12 +126,13 @@ export default function LoginPage() {
             <input
               className="input dark"
               type="password"
+              disabled={!serverReady}
               value={credentials.password}
               onChange={(event) => setCredentials((prev) => ({ ...prev, password: event.target.value }))}
-              placeholder="••••••"
+              placeholder="??????"
             />
           </label>
-          <button className="btn btn-primary" type="submit" disabled={loading}>
+          <button className="btn btn-primary" type="submit" disabled={loading || !serverReady}>
             {loading ? 'Authenticating…' : 'Enter Studio'}
           </button>
         </form>
@@ -104,6 +140,26 @@ export default function LoginPage() {
           Connection Settings
         </button>
       </div>
+      {(serverChecking || !serverReady) && (
+        <div className="login-overlay">
+          <div className="login-overlay-card glass-surface">
+            <div className="spinner" />
+            <div>
+              <h4>{serverChecking ? 'Starting server...' : 'Server not reachable'}</h4>
+              <p className="muted">
+                {serverChecking
+                  ? 'Please wait while the system gets ready.'
+                  : 'Check the server or update the API base in settings.'}
+              </p>
+            </div>
+            {!serverChecking && (
+              <button className="btn btn-secondary" onClick={() => setConnectionOpen(true)}>
+                Open Connection Settings
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       {connectionOpen && (
         <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', overflow: 'hidden', zIndex: 20 }}>
           <div className="modal-backdrop" onClick={() => setConnectionOpen(false)} />
@@ -123,7 +179,7 @@ export default function LoginPage() {
                 className="input dark"
                 value={serverInput}
                 onChange={(event) => setServerInput(event.target.value)}
-                placeholder="http://127.0.0.1:8000"
+                placeholder="??????"
               />
             </label>
             <footer className="modal-footer">

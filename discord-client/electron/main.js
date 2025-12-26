@@ -17,6 +17,7 @@ const ROOT_DIR = path.resolve(__dirname, '..', '..');
 const PYTHON_ENTRY = path.join(ROOT_DIR, 'backend', 'app.py');
 const BACKEND_EXE = path.join(process.resourcesPath, 'backend', 'report-backend.exe');
 const SHOULD_START_BACKEND = process.env.FAIZAN_START_BACKEND !== '0';
+const HEALTH_URL = 'http://127.0.0.1:8000/health';
 
 const getOutputDir = () => {
   return app.isPackaged ? path.join(process.resourcesPath, 'output') : path.join(ROOT_DIR, 'output');
@@ -45,10 +46,29 @@ function startPythonServer() {
   });
 }
 
+const waitForBackend = async () => {
+  if (!SHOULD_START_BACKEND || isDev || typeof fetch !== 'function') {
+    return;
+  }
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      const response = await fetch(HEALTH_URL, { method: 'GET' });
+      if (response.ok) {
+        return;
+      }
+    } catch (_error) {
+      // Ignore until backend is ready.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+};
+
 const broadcastWindowState = () => {
-  if (!mainWindow) return;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
   const state = mainWindow.isMaximized() ? 'maximized' : 'normal';
-  mainWindow.webContents.send('window-state', state);
+  const contents = mainWindow.webContents;
+  if (!contents || contents.isDestroyed()) return;
+  contents.send('window-state', state);
 };
 
 const { autoUpdater } = updaterPkg;
@@ -172,7 +192,9 @@ ipcMain.handle('open-output-folder', async () => {
 
 app.whenReady().then(() => {
   startPythonServer();
-  createWindow();
+  waitForBackend().finally(() => {
+    createWindow();
+  });
   if (!isDev) {
     wireAutoUpdater();
     autoUpdater.checkForUpdatesAndNotify();
