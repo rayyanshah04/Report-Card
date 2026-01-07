@@ -29,4 +29,6 @@ contextBridge.exposeInMainWorld('desktop', {
     install: () => ipcRenderer.invoke('update-install'),
   },
   openOutputFolder: () => ipcRenderer.invoke('open-output-folder'),
+  getConnectionConfig: () => ipcRenderer.invoke('get-connection-config'),
+  saveConnectionConfig: (payload) => ipcRenderer.invoke('save-connection-config', payload),
 });

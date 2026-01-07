@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import logging
+import threading
 from datetime import datetime
 import re
 from io import BytesIO
@@ -405,19 +406,22 @@ def ensure_diagnostics_queue_table():
 
 @app.on_event("startup")
 def initialize_report_queue():
-    try:
-        ensure_report_queue_table()
-        ensure_report_results_table()
-        ensure_diagnostics_queue_table()
-        migrate_principal_roles()
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM report_queue")
-        cursor.execute("DELETE FROM diagnostics_queue")
-        conn.commit()
-        conn.close()
-    except Exception as exc:  # pragma: no cover
-        print(f"Unable to prepare queue tables: {exc}")
+    def init_task():
+        try:
+            ensure_report_queue_table()
+            ensure_report_results_table()
+            ensure_diagnostics_queue_table()
+            migrate_principal_roles()
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM report_queue")
+            cursor.execute("DELETE FROM diagnostics_queue")
+            conn.commit()
+            conn.close()
+        except Exception as exc:  # pragma: no cover
+            print(f"Unable to prepare queue tables: {exc}")
+
+    threading.Thread(target=init_task, daemon=True).start()
 
 
 @app.get("/health")

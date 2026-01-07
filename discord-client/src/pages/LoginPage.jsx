@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 import useToast from '../hooks/useToast';
@@ -16,6 +16,12 @@ export default function LoginPage() {
   const [healthStatus, setHealthStatus] = useState(null);
   const [serverReady, setServerReady] = useState(false);
   const [serverChecking, setServerChecking] = useState(true);
+  const [connectionMode, setConnectionMode] = useState('host');
+  const [hostIpInput, setHostIpInput] = useState('');
+  const [healthProgress, setHealthProgress] = useState(0);
+  const [healthElapsed, setHealthElapsed] = useState(0);
+  const [healthError, setHealthError] = useState('');
+  const healthStartRef = useRef(Date.now());
 
   useEffect(() => {
     if (!connectionOpen) {
@@ -29,45 +35,99 @@ export default function LoginPage() {
 
     const pollHealth = async () => {
       setServerChecking(true);
-      for (let attempt = 0; attempt < 20; attempt += 1) {
+      healthStartRef.current = Date.now();
+      setHealthElapsed(0);
+      setHealthProgress(0);
+      setHealthError('');
+      const maxAttempts = 10;
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         try {
           const response = await api.get('/health');
           if (response.data?.status === 'ok') {
             if (!cancelled) {
               setServerReady(true);
               setServerChecking(false);
+              setHealthProgress(100);
+              setHealthError('');
             }
             return;
           }
-        } catch (_error) {
-          // Ignore until backend is ready.
+        } catch (error) {
+          if (!cancelled) {
+            setHealthError(error?.response?.data?.detail || error?.message || '');
+          }
+        }
+        if (!cancelled) {
+          setHealthProgress(Math.round(((attempt + 1) / maxAttempts) * 100));
+          setHealthElapsed(Math.round((Date.now() - healthStartRef.current) / 1000));
         }
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
       if (!cancelled) {
         setServerReady(false);
         setServerChecking(false);
+        setHealthElapsed(Math.round((Date.now() - healthStartRef.current) / 1000));
       }
     };
 
     pollHealth();
+    const intervalId = setInterval(pollHealth, 8000);
     return () => {
       cancelled = true;
+      clearInterval(intervalId);
     };
+  }, [serverInput]);
+
+  useEffect(() => {
+    const loadConfig = async () => {
+      const storedMode = localStorage.getItem('faizan-connection-mode');
+      const storedIp = localStorage.getItem('faizan-host-ip');
+      if (storedMode) {
+        setConnectionMode(storedMode);
+      }
+      if (storedIp) {
+        setHostIpInput(storedIp);
+      }
+      if (window?.desktop?.getConnectionConfig) {
+        const saved = await window.desktop.getConnectionConfig();
+        if (saved?.mode) {
+          setConnectionMode(saved.mode);
+        }
+        if (saved?.hostIp) {
+          setHostIpInput(saved.hostIp);
+        }
+      }
+    };
+    loadConfig();
   }, []);
+
+  useEffect(() => {
+    if (connectionMode === 'host') {
+      const nextBase = setApiBase('http://127.0.0.1:8000');
+      setServerInput(nextBase);
+      return;
+    }
+    if (hostIpInput.trim()) {
+      const nextBase = setApiBase(`http://${hostIpInput.trim()}:8000`);
+      setServerInput(nextBase);
+    }
+  }, [connectionMode, hostIpInput]);
 
   const handleTestConnection = async () => {
     try {
       const response = await api.get('/health');
       if (response.data?.status === 'ok') {
         setHealthStatus('ok');
+        setHealthError('');
         pushToast({ type: 'success', title: 'Connected', message: 'Server is reachable.' });
       } else {
         setHealthStatus('fail');
+        setHealthError('Server responded unexpectedly.');
         pushToast({ type: 'error', title: 'Not ready', message: 'Server responded unexpectedly.' });
       }
     } catch (error) {
       setHealthStatus('fail');
+      setHealthError(error.response?.data?.detail || error.message);
       pushToast({
         type: 'error',
         title: 'Connection failed',
@@ -80,6 +140,23 @@ export default function LoginPage() {
     const nextBase = setApiBase(serverInput);
     setServerInput(nextBase);
     pushToast({ type: 'success', title: 'Saved', message: `Server set to ${nextBase}.` });
+  };
+
+  const handleSaveConnection = async () => {
+    localStorage.setItem('faizan-connection-mode', connectionMode);
+    localStorage.setItem('faizan-host-ip', hostIpInput.trim());
+    if (window?.desktop?.saveConnectionConfig) {
+      const result = await window.desktop.saveConnectionConfig({
+        mode: connectionMode,
+        hostIp: hostIpInput.trim(),
+        updatedAt: new Date().toISOString(),
+      });
+      if (result?.ok === false) {
+        pushToast({ type: 'error', title: 'Save failed', message: result.error || 'Unable to save config.' });
+        return;
+      }
+    }
+    pushToast({ type: 'success', title: 'Connection saved', message: 'Startup mode saved.' });
   };
 
   const handleSubmit = async (event) => {
@@ -110,12 +187,60 @@ export default function LoginPage() {
           <p className="muted">Sign in with your staff credentials to enter the Discord-quality console.</p>
         </div>
         <form className="login-form" onSubmit={handleSubmit}>
+          <div className={`login-status ${serverReady ? 'is-ok' : 'is-warn'}`}>
+            <span className={`login-status-icon ${serverChecking ? 'is-spin' : ''}`} />
+            <span>
+              {serverChecking && `Starting server... (${healthElapsed}s)`}
+              {!serverChecking && serverReady && 'Server ready'}
+              {!serverChecking && !serverReady && `Server not reachable (${healthElapsed}s)`}
+            </span>
+          </div>
+          <div className="login-progress">
+            <div className="login-progress-bar" style={{ width: `${healthProgress}%` }} />
+          </div>
+          {!serverChecking && !serverReady && healthError && (
+            <div className="login-status-error">{healthError}</div>
+          )}
+          <div className="login-connection-mode">
+            <button
+              type="button"
+              className={`btn ${connectionMode === 'host' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setConnectionMode('host')}
+            >
+              This PC is Host
+            </button>
+            <button
+              type="button"
+              className={`btn ${connectionMode === 'client' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setConnectionMode('client')}
+            >
+              This PC is User
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={handleSaveConnection}
+            >
+              Save Mode
+            </button>
+          </div>
+          {connectionMode === 'client' && (
+            <label>
+              <span>Host IP Address</span>
+              <input
+                className="input dark"
+                type="text"
+                value={hostIpInput}
+                onChange={(event) => setHostIpInput(event.target.value)}
+                placeholder="e.g., 192.168.0.205"
+              />
+            </label>
+          )}
           <label>
             <span>Username</span>
             <input
               className="input dark"
               type="text"
-              disabled={!serverReady}
               value={credentials.username}
               onChange={(event) => setCredentials((prev) => ({ ...prev, username: event.target.value }))}
               placeholder="e.g., admin"
@@ -126,40 +251,19 @@ export default function LoginPage() {
             <input
               className="input dark"
               type="password"
-              disabled={!serverReady}
               value={credentials.password}
               onChange={(event) => setCredentials((prev) => ({ ...prev, password: event.target.value }))}
-              placeholder="??????"
+              placeholder="******"
             />
           </label>
-          <button className="btn btn-primary" type="submit" disabled={loading || !serverReady}>
-            {loading ? 'Authenticating…' : 'Enter Studio'}
+          <button className="btn btn-primary" type="submit" disabled={loading}>
+            {loading ? 'Authenticating...' : 'Enter Studio'}
           </button>
         </form>
         <button className="btn btn-ghost" type="button" onClick={() => setConnectionOpen(true)}>
           Connection Settings
         </button>
       </div>
-      {(serverChecking || !serverReady) && (
-        <div className="login-overlay">
-          <div className="login-overlay-card glass-surface">
-            <div className="spinner" />
-            <div>
-              <h4>{serverChecking ? 'Starting server...' : 'Server not reachable'}</h4>
-              <p className="muted">
-                {serverChecking
-                  ? 'Please wait while the system gets ready.'
-                  : 'Check the server or update the API base in settings.'}
-              </p>
-            </div>
-            {!serverChecking && (
-              <button className="btn btn-secondary" onClick={() => setConnectionOpen(true)}>
-                Open Connection Settings
-              </button>
-            )}
-          </div>
-        </div>
-      )}
       {connectionOpen && (
         <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', overflow: 'hidden', zIndex: 20 }}>
           <div className="modal-backdrop" onClick={() => setConnectionOpen(false)} />
@@ -179,7 +283,7 @@ export default function LoginPage() {
                 className="input dark"
                 value={serverInput}
                 onChange={(event) => setServerInput(event.target.value)}
-                placeholder="??????"
+                placeholder="http://127.0.0.1:8000"
               />
             </label>
             <footer className="modal-footer">

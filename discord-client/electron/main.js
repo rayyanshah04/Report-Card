@@ -18,6 +18,8 @@ const PYTHON_ENTRY = path.join(ROOT_DIR, 'backend', 'app.py');
 const BACKEND_EXE = path.join(process.resourcesPath, 'backend', 'report-backend.exe');
 const SHOULD_START_BACKEND = process.env.FAIZAN_START_BACKEND !== '0';
 const HEALTH_URL = 'http://127.0.0.1:8000/health';
+const SETTINGS_DIR = app.isPackaged ? app.getPath('userData') : path.join(ROOT_DIR, 'settings');
+const CONNECTION_CONFIG = path.join(SETTINGS_DIR, 'connection_config.json');
 
 const getOutputDir = () => {
   return app.isPackaged ? path.join(process.resourcesPath, 'output') : path.join(ROOT_DIR, 'output');
@@ -188,6 +190,28 @@ ipcMain.handle('open-output-folder', async () => {
   const outputDir = getOutputDir();
   fs.mkdirSync(outputDir, { recursive: true });
   return shell.openPath(outputDir);
+});
+
+ipcMain.handle('get-connection-config', () => {
+  try {
+    if (!fs.existsSync(CONNECTION_CONFIG)) {
+      return null;
+    }
+    const raw = fs.readFileSync(CONNECTION_CONFIG, 'utf-8');
+    return JSON.parse(raw);
+  } catch (error) {
+    return { error: error?.message || 'Unable to read connection config.' };
+  }
+});
+
+ipcMain.handle('save-connection-config', (_event, payload) => {
+  try {
+    fs.mkdirSync(SETTINGS_DIR, { recursive: true });
+    fs.writeFileSync(CONNECTION_CONFIG, JSON.stringify(payload, null, 2), 'utf-8');
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error?.message || 'Unable to save connection config.' };
+  }
 });
 
 app.whenReady().then(() => {
