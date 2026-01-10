@@ -42,7 +42,7 @@ export default function SettingsPage() {
   const [editingFilter, setEditingFilter] = useState(null);
   const [apiBaseInput, setApiBaseInput] = useState(getApiBase());
   const [dbConfig, setDbConfig] = useState({
-    host: '192.168.0.205',
+    host: '127.0.0.1',
     port: 5432,
     dbname: 'report_system',
     user: 'postgres',
@@ -1021,3 +1021,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

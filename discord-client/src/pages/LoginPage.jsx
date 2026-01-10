@@ -103,7 +103,8 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (connectionMode === 'host') {
-      const nextBase = setApiBase('http://127.0.0.1:8000');
+      const hostname = window.location.hostname && window.location.hostname !== '' ? window.location.hostname : '127.0.0.1';
+      const nextBase = setApiBase(`http://${hostname}:8000`);
       setServerInput(nextBase);
       return;
     }
@@ -232,7 +233,7 @@ export default function LoginPage() {
                 type="text"
                 value={hostIpInput}
                 onChange={(event) => setHostIpInput(event.target.value)}
-                placeholder="e.g., 192.168.0.205"
+                placeholder="e.g., 192.168.0.x"
               />
             </label>
           )}
@@ -304,3 +305,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

@@ -503,10 +503,6 @@
    'C:\\Users\\Rayyan '
    'Shah\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\PIL\\__init__.py',
    'PYMODULE'),
-  ('PIL.AvifImagePlugin',
-   'C:\\Users\\Rayyan '
-   'Shah\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\PIL\\AvifImagePlugin.py',
-   'PYMODULE'),
   ('PIL.BlpImagePlugin',
    'C:\\Users\\Rayyan '
    'Shah\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\PIL\\BlpImagePlugin.py',
@@ -658,10 +654,6 @@
   ('PIL.ImageShow',
    'C:\\Users\\Rayyan '
    'Shah\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\PIL\\ImageShow.py',
-   'PYMODULE'),
-  ('PIL.ImageText',
-   'C:\\Users\\Rayyan '
-   'Shah\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\PIL\\ImageText.py',
    'PYMODULE'),
   ('PIL.ImageTk',
    'C:\\Users\\Rayyan '
@@ -1194,6 +1186,10 @@
   ('base64',
    'C:\\Users\\Rayyan '
    'Shah\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\base64.py',
+   'PYMODULE'),
+  ('bcrypt',
+   'C:\\Users\\Rayyan '
+   'Shah\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\bcrypt\\__init__.py',
    'PYMODULE'),
   ('bdb',
    'C:\\Users\\Rayyan '
@@ -7985,6 +7981,10 @@
    'C:\\Users\\Rayyan '
    'Shah\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\pydantic\\_internal\\_model_construction.py',
    'PYMODULE'),
+  ('pydantic._internal._namespace_utils',
+   'C:\\Users\\Rayyan '
+   'Shah\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\pydantic\\_internal\\_namespace_utils.py',
+   'PYMODULE'),
   ('pydantic._internal._repr',
    'C:\\Users\\Rayyan '
    'Shah\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\pydantic\\_internal\\_repr.py',
@@ -10481,10 +10481,6 @@
    'C:\\Users\\Rayyan '
    'Shah\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\sqlalchemy\\dialects\\mysql\\json.py',
    'PYMODULE'),
-  ('sqlalchemy.dialects.mysql.mariadb',
-   'C:\\Users\\Rayyan '
-   'Shah\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\sqlalchemy\\dialects\\mysql\\mariadb.py',
-   'PYMODULE'),
   ('sqlalchemy.dialects.mysql.mariadbconnector',
    'C:\\Users\\Rayyan '
    'Shah\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\sqlalchemy\\dialects\\mysql\\mariadbconnector.py',
@@ -10540,10 +10536,6 @@
   ('sqlalchemy.dialects.oracle.types',
    'C:\\Users\\Rayyan '
    'Shah\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\sqlalchemy\\dialects\\oracle\\types.py',
-   'PYMODULE'),
-  ('sqlalchemy.dialects.oracle.vector',
-   'C:\\Users\\Rayyan '
-   'Shah\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\sqlalchemy\\dialects\\oracle\\vector.py',
    'PYMODULE'),
   ('sqlalchemy.dialects.postgresql',
    'C:\\Users\\Rayyan '

@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 const STORAGE_KEY = 'faizan-api-base';
-export const DEFAULT_API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000';
+const hostname = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : '127.0.0.1';
+export const DEFAULT_API_BASE = import.meta.env.VITE_API_BASE || `http://${hostname}:8000`;
 
 export function getApiBase() {
   if (typeof localStorage === 'undefined') return DEFAULT_API_BASE;
